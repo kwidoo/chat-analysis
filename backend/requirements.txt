@@ -1,6 +1,11 @@
 flask
 dask
+distributed
 sentence-transformers
 pandas
 numpy
 scikit-learn
+faiss-cpu
+dask[distributed]
+dask[dataframe]
+dask[bag]
