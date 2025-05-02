@@ -2,20 +2,28 @@
     "name": "frontend",
     "version": "0.1.0",
     "private": true,
+    "module": "esnext",
+    "type": "module",
+    "description": "Frontend for the project",
     "dependencies": {
-        "react": "^17.0.2",
-        "react-dom": "^17.0.2",
-        "react-scripts": "4.0.3",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-router-dom": "^6.15.0",
         "recharts": "^2.5.0",
         "axios": "^1.4.0"
     },
-    "scripts": {
-        "start": "react-scripts start",
-        "build": "react-scripts build",
-        "test": "react-scripts test",
-        "eject": "react-scripts eject"
+    "devDependencies": {
+        "vite": "^5.0.0",
+        "@vitejs/plugin-react": "^4.4.1",
+        "@tailwindcss/vite": "^4.1.4",
+        "tailwindcss": "^4.1.4"
     },
-    "proxy": "http://backend:5000",
+    "scripts": {
+        "dev": "vite",
+        "start": "vite",
+        "build": "vite build",
+        "preview": "vite preview --host --port 3000"
+    },
     "browserslist": {
         "production": [
             ">0.2%",

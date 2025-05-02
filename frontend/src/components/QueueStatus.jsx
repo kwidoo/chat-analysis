@@ -15,7 +15,7 @@ const QueueStatus = () => {
   useEffect(() => {
     const fetchQueueStatus = async () => {
       try {
-        const response = await fetch("/api/queue/status");
+        const response = await fetch("http://backend:5000/queue/status");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -41,11 +41,19 @@ const QueueStatus = () => {
   }, []);
 
   if (loading) {
-    return <div className="loading">Loading queue status...</div>;
+    return (
+      <div className="text-center p-5 italic text-gray-500">
+        Loading queue status...
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="error-message">{error}</div>;
+    return (
+      <div className="p-3 mb-3 bg-red-50 text-red-800 rounded-md border-l-4 border-red-600">
+        {error}
+      </div>
+    );
   }
 
   // Calculate completion percentage
@@ -55,38 +63,50 @@ const QueueStatus = () => {
     totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
   return (
-    <div className="queue-status">
-      <h3>Processing Queue Status</h3>
+    <div className="mt-5">
+      <h3 className="text-xl font-semibold mb-4">Processing Queue Status</h3>
 
-      <div className="queue-metrics">
-        <div className="metric">
-          <span className="label">Pending:</span>
-          <span className="value">{queueData.queue_length}</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="p-4 bg-gray-50 rounded-md text-center">
+          <span className="block mb-2 text-gray-600 font-medium">Pending:</span>
+          <span className="text-2xl font-bold text-gray-800">
+            {queueData.queue_length}
+          </span>
         </div>
 
-        <div className="metric">
-          <span className="label">Total Submitted:</span>
-          <span className="value">{queueData.stats.total}</span>
+        <div className="p-4 bg-gray-50 rounded-md text-center">
+          <span className="block mb-2 text-gray-600 font-medium">
+            Total Submitted:
+          </span>
+          <span className="text-2xl font-bold text-gray-800">
+            {queueData.stats.total}
+          </span>
         </div>
 
-        <div className="metric">
-          <span className="label">Processed:</span>
-          <span className="value">{queueData.stats.processed}</span>
+        <div className="p-4 bg-gray-50 rounded-md text-center">
+          <span className="block mb-2 text-gray-600 font-medium">
+            Processed:
+          </span>
+          <span className="text-2xl font-bold text-gray-800">
+            {queueData.stats.processed}
+          </span>
         </div>
 
-        <div className="metric">
-          <span className="label">Failed:</span>
-          <span className="value">{queueData.stats.failed}</span>
+        <div className="p-4 bg-gray-50 rounded-md text-center">
+          <span className="block mb-2 text-gray-600 font-medium">Failed:</span>
+          <span className="text-2xl font-bold text-gray-800">
+            {queueData.stats.failed}
+          </span>
         </div>
       </div>
 
-      <div className="progress-container">
-        <div className="progress-label">
+      <div className="mt-6">
+        <div className="font-bold mb-2">
           Overall Progress: {completionPercentage}%
         </div>
-        <div className="progress-bar">
+        <div className="h-5 bg-gray-200 rounded-full overflow-hidden">
           <div
-            className="progress-fill"
+            className="h-full bg-green-600 transition-all duration-500"
             style={{ width: `${completionPercentage}%` }}
           />
         </div>
