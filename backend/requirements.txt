@@ -9,3 +9,4 @@ faiss-cpu
 dask[distributed]
 dask[dataframe]
 dask[bag]
+gunicorn

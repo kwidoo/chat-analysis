@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first
-COPY backend/requirements.txt .
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
@@ -25,7 +25,7 @@ RUN mkdir -p /app/models/versions/v1 \
     /app/queues
 
 # Copy application code
-COPY backend/ .
+COPY . .
 
 # Healthcheck
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \

@@ -12,17 +12,19 @@ services:
     environment:
       - ACTIVE_MODEL=v1
       - PYTHONUNBUFFERED=1
-    container_name: backend
+    container_name: backend-chat-analysis
     hostname: backend
 
   frontend:
     build: ./frontend
     depends_on:
       - backend
+    ports:
+      - "881:3000"
     networks:
       - analysis-net
       - nginx-proxy_default
-    container_name: frontend
+    container_name: frontend-chat-analysis
     hostname: frontend
 
   dask-scheduler:
@@ -40,8 +42,6 @@ services:
       replicas: 2
     networks:
       - analysis-net
-    container_name: dask-worker
-    hostname: dask-worker
 
 networks:
   analysis-net:
