@@ -1,0 +1,6 @@
+flask
+dask
+sentence-transformers
+pandas
+numpy
+scikit-learn

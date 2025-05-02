@@ -1,0 +1,42 @@
+version: "3.8"
+services:
+  backend:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Apple M1 GPU support settings
+      - MPS_AVAILABLE=1
+      - DEVICE=mps
+
+  frontend:
+    image: node:14
+    command: npm start
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app/frontend
+    working_dir: /app/frontend
+    depends_on:
+      - backend
+    environment:
+      - CHROME_HEADLESS=true
+      - REACT_APP_API_URL=http://localhost:5000
+
+  dask-scheduler:
+    image: daskdev/dask
+    ports:
+      - "8786:8786"
+      - "8787:8787"
+    command: ["dask-scheduler"]
+
+  dask-worker:
+    image: daskdev/dask
+    depends_on:
+      - dask-scheduler
+    command: ["dask-worker", "tcp://dask-scheduler:8786"]
+    environment:
+      - MPS_AVAILABLE=1 # For Apple M1 support
