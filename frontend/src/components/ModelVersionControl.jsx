@@ -7,7 +7,7 @@ const ModelVersionControl = () => {
 
   // Fetch the current active model on component mount
   useEffect(() => {
-    fetch("http://backend:5000/health")
+    fetch("/api/health")
       .then((response) => response.json())
       .then((data) => {
         setActiveModel(data.model);
@@ -23,9 +23,7 @@ const ModelVersionControl = () => {
     setError(null);
 
     try {
-      const response = await fetch(
-        `http://backend:5000/models/switch/${version}`
-      );
+      const response = await fetch(`/api/models/switch/${version}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

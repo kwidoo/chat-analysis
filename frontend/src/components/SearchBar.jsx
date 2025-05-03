@@ -10,7 +10,7 @@ const SearchBar = ({ onSearch }) => {
     setLoading(true);
 
     try {
-      const response = await fetch("http://backend:5000/search", {
+      const response = await fetch("http://backend:5000/api/search", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

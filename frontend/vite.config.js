@@ -15,7 +15,14 @@ export default defineConfig({
         port: 3000,
         host: true,
         strictPort: true,
-        historyApiFallback: true
+        historyApiFallback: true,
+        proxy: {
+            '/api': {
+                target: 'http://backend:5000',
+                changeOrigin: true,
+                secure: false,
+            }
+        }
     },
     resolve: {
         alias: {

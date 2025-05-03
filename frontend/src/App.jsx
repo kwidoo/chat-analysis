@@ -23,7 +23,7 @@ function App() {
     }
 
     try {
-      const response = await fetch("http://backend:5000/upload", {
+      const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
@@ -45,7 +45,7 @@ function App() {
   const pollTaskStatus = (id) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`http://backend:5000/status/${id}`);
+        const response = await fetch(`/api/status/${id}`);
         const data = await response.json();
         setTaskStatus(
           `Status: ${data.status} (Processed: ${

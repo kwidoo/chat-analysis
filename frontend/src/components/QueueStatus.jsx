@@ -15,7 +15,7 @@ const QueueStatus = () => {
   useEffect(() => {
     const fetchQueueStatus = async () => {
       try {
-        const response = await fetch("http://backend:5000/queue/status");
+        const response = await fetch("/api/queue/status");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
