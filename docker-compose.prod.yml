@@ -11,6 +11,8 @@ services:
     container_name: frontend
     hostname: frontend
     restart: unless-stopped
+    # Adding explicit empty volumes to avoid ContainerConfig error
+    volumes: []
   rabbitmq:
     image: rabbitmq:3-management
     environment:
