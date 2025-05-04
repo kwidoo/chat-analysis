@@ -2,15 +2,14 @@ kind: pipeline
 type: docker
 name: chat-analysis-system-pipeline
 node:
-  worker: drone-ai
-
-clone:
-  disable: false
-  depth: 50
+  machine: drone-ai
 
 steps:
   - name: test-backend
     image: python:3.10
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
     commands:
       - cd backend
       - pip install -r requirements.txt
@@ -18,6 +17,9 @@ steps:
       - pytest tests/
   - name: build-backend
     image: plugins/docker
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
     settings:
       repo: ${DRONE_REPO_OWNER}/chat-analysis-backend
       tags:
@@ -35,6 +37,9 @@ steps:
         - main
   - name: build-frontend
     image: plugins/docker
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
     settings:
       repo: ${DRONE_REPO_OWNER}/chat-analysis-frontend
       tags:
@@ -69,7 +74,7 @@ steps:
       - envsubst < docker-compose.prod.yml > docker-compose.final.yml
       - docker-compose -f docker-compose.final.yml up -d
     volumes:
-      - name: docker-socket
+      - name: docker_sock
         path: /var/run/docker.sock
       - name: docker-certs
         path: /certs/client
@@ -84,7 +89,7 @@ services:
       - name: docker-socket
         path: /var/run/docker.sock
 volumes:
-  - name: docker-socket
+  - name: docker_sock
     host:
       path: /var/lib/docker.sock
   - name: docker-certs
