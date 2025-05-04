@@ -1,0 +1,98 @@
+services:
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=/api
+    depends_on:
+      - backend
+    networks:
+      - analysis-net
+    container_name: frontend
+    hostname: frontend
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - analysis-net
+    container_name: rabbitmq
+    hostname: rabbitmq
+    restart: unless-stopped
+
+  dask-scheduler:
+    image: ghcr.io/dask/dask:latest
+    command: ["dask", "scheduler"]
+    networks:
+      - analysis-net
+    container_name: scheduler
+    hostname: scheduler
+    restart: unless-stopped
+
+  dask-worker:
+    image: ghcr.io/dask/dask:latest
+    command: ["dask", "worker", "tcp://scheduler:8786"]
+    environment:
+      - DASK_SCHEDULER=tcp://scheduler:8786
+    depends_on:
+      - dask-scheduler
+    networks:
+      - analysis-net
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      - DASK_SCHEDULER=tcp://scheduler:8786
+    depends_on:
+      - rabbitmq
+      - dask-scheduler
+    networks:
+      - analysis-net
+    container_name: backend
+    hostname: backend
+    restart: unless-stopped
+    volumes:
+      - faiss_data:/app/faiss
+      - uploads_data:/app/uploads
+      - models_data:/app/models
+
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    ports:
+      - "80:80" # Production port
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - analysis-net
+    container_name: nginx
+    hostname: nginx
+    restart: unless-stopped
+
+networks:
+  analysis-net:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+    driver: local
+  faiss_data:
+    driver: local
+  uploads_data:
+    driver: local
+  models_data:
+    driver: local

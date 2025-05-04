@@ -1,0 +1,102 @@
+kind: pipeline
+type: docker
+name: chat-analysis-system-pipeline
+
+node:
+  worker: drone-ai
+
+steps:
+  - name: test-backend
+    image: python:3.8
+    commands:
+      - cd backend
+      - pip install -r requirements.txt
+      - pip install pytest
+      - pytest tests/
+
+  - name: build-backend
+    image: plugins/docker
+    settings:
+      repo: ${DRONE_REPO_OWNER}/chat-analysis-backend
+      tags:
+        - ${DRONE_COMMIT_SHA:0:8}
+        - latest
+      dockerfile: backend/Dockerfile
+      context: backend/
+      registry: ${DOCKER_REGISTRY}
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+    when:
+      branch:
+        - main
+
+  - name: build-frontend
+    image: plugins/docker
+    settings:
+      repo: ${DRONE_REPO_OWNER}/chat-analysis-frontend
+      tags:
+        - ${DRONE_COMMIT_SHA:0:8}
+        - latest
+      dockerfile: frontend/Dockerfile
+      context: frontend/
+      registry: ${DOCKER_REGISTRY}
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+    when:
+      branch:
+        - main
+
+  - name: deploy
+    image: docker/compose:1.29.2
+    environment:
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_TLS_VERIFY: 1
+      DOCKER_CERT_PATH: /certs/client
+      BACKEND_IMAGE: ${DOCKER_REGISTRY}/${DRONE_REPO_OWNER}/chat-analysis-backend:${DRONE_COMMIT_SHA:0:8}
+      FRONTEND_IMAGE: ${DOCKER_REGISTRY}/${DRONE_REPO_OWNER}/chat-analysis-frontend:${DRONE_COMMIT_SHA:0:8}
+      RABBITMQ_USER:
+        from_secret: rabbitmq_user
+      RABBITMQ_PASSWORD:
+        from_secret: rabbitmq_password
+      FLASK_SECRET_KEY:
+        from_secret: flask_secret_key
+    commands:
+      - echo "Deploying application..."
+      - envsubst < docker-compose.prod.yml > docker-compose.final.yml
+      - docker-compose -f docker-compose.final.yml up -d
+    volumes:
+      - name: docker-socket
+        path: /var/run/docker.sock
+      - name: docker-certs
+        path: /certs/client
+    when:
+      branch:
+        - main
+
+services:
+  - name: docker
+    image: docker:dind
+    privileged: true
+    volumes:
+      - name: docker-socket
+        path: /var/run/docker.sock
+
+volumes:
+  - name: docker-socket
+    host:
+      path: /var/run/docker.sock
+  - name: docker-certs
+    host:
+      path: /home/drone/certs
+
+trigger:
+  branch:
+    - main
+    - develop
+  event:
+    - push
+    - pull_request
