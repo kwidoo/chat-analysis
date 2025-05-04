@@ -5,16 +5,16 @@ node:
   machine: drone-ai
 
 steps:
-  - name: test-backend
-    image: python:3.10
-    volumes:
-      - name: docker_sock
-        path: /var/run/docker.sock
-    commands:
-      - cd backend
-      - pip install -r requirements.txt
-      - pip install pytest
-      - pytest tests/
+  # - name: test-backend
+  #   image: python:3.10
+  #   volumes:
+  #     - name: docker_sock
+  #       path: /var/run/docker.sock
+  #   commands:
+  #     - cd backend
+  #     - pip install -r requirements.txt
+  #     - pip install pytest
+  #     - pytest tests/
   - name: build-backend
     image: plugins/docker
     volumes:

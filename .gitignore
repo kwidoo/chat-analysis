@@ -8,3 +8,5 @@ deployment.md
 merged.py
 production-tasks.md
 refactoring-guidelines.md
+.venv
+__pycache__
