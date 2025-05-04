@@ -58,8 +58,9 @@ steps:
   - name: deploy
     image: docker/compose:1.29.2
     environment:
-      BACKEND_IMAGE: ${DOCKER_REGISTRY}/${DRONE_REPO_OWNER}/chat-analysis-backend:${DRONE_COMMIT_SHA:0:8}
-      FRONTEND_IMAGE: ${DOCKER_REGISTRY}/${DRONE_REPO_OWNER}/chat-analysis-frontend:${DRONE_COMMIT_SHA:0:8}
+      DOCKER_REGISTRY: docker.io
+      BACKEND_IMAGE: docker.io/${DRONE_REPO_OWNER}/chat-analysis-backend:${DRONE_COMMIT_SHA:0:8}
+      FRONTEND_IMAGE: docker.io/${DRONE_REPO_OWNER}/chat-analysis-frontend:${DRONE_COMMIT_SHA:0:8}
       RABBITMQ_USER:
         from_secret: rabbitmq_user
       RABBITMQ_PASSWORD:
@@ -69,7 +70,10 @@ steps:
     commands:
       - apk add --no-cache gettext
       - echo "Deploying application..."
+      - echo "Using backend image: $BACKEND_IMAGE"
+      - echo "Using frontend image: $FRONTEND_IMAGE"
       - envsubst < docker-compose.prod.yml > docker-compose.final.yml
+      - cat docker-compose.final.yml | grep -v password | grep -v secret # Log the file without sensitive data
       - docker-compose -f docker-compose.final.yml up -d
     volumes:
       - name: docker_sock
