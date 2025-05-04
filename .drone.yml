@@ -3,6 +3,11 @@ type: docker
 name: chat-analysis-system-pipeline
 node:
   worker: drone-ai
+
+clone:
+  disable: false
+  depth: 50
+
 steps:
   - name: test-backend
     image: python:3.10
@@ -81,7 +86,7 @@ services:
 volumes:
   - name: docker-socket
     host:
-      path: /var/run/docker.sock
+      path: /var/lib/docker.sock
   - name: docker-certs
     host:
       path: /home/drone/certs
@@ -92,3 +97,4 @@ trigger:
   event:
     - push
     - pull_request
+    - custom
