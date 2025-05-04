@@ -70,8 +70,6 @@ steps:
     commands:
       - apk add --no-cache gettext
       - echo "Deploying application..."
-      - echo "Using backend image: $BACKEND_IMAGE"
-      - echo "Using frontend image: $FRONTEND_IMAGE"
       - envsubst < docker-compose.prod.yml > docker-compose.final.yml
       - cat docker-compose.final.yml | grep -v password | grep -v secret # Log the file without sensitive data
       - docker-compose -f docker-compose.final.yml up -d
