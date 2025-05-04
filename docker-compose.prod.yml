@@ -2,17 +2,11 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE}
     environment:
-      - NODE_ENV=production
-      - REACT_APP_API_URL=/api
-    depends_on:
-      - backend
+      NODE_ENV: production
+      REACT_APP_API_URL: /api
     networks:
       - analysis-net
-    container_name: frontend
-    hostname: frontend
     restart: unless-stopped
-    # Adding explicit empty volumes to avoid ContainerConfig error
-    volumes: []
   rabbitmq:
     image: rabbitmq:3-management
     environment:
