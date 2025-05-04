@@ -1,2 +1,10 @@
 task*.md
 .stignore
+completed-tasks.md
+concat.sh
+context.md
+deploy.sh
+deployment.md
+merged.py
+production-tasks.md
+refactoring-guidelines.md

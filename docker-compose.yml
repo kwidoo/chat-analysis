@@ -1,50 +1,94 @@
 services:
-  backend:
-    build: ./backend
-    volumes:
-      - ./backend/models:/app/models
-      - ./backend/faiss:/app/faiss
-      - ./backend/queues:/app/queues
-    networks:
-      - analysis-net
-    depends_on:
-      - dask-scheduler
-    environment:
-      - ACTIVE_MODEL=v1
-      - PYTHONUNBUFFERED=1
-    container_name: backend-chat-analysis
-    hostname: backend
-
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=/api
     depends_on:
       - backend
-    ports:
-      - "881:3000"
     networks:
       - analysis-net
-      - nginx-proxy_default
-    container_name: frontend-chat-analysis
+    container_name: frontend
     hostname: frontend
 
-  dask-scheduler:
-    image: daskdev/dask:latest
-    command: dask-scheduler
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - analysis-net
-    container_name: dask-scheduler
-    hostname: dask-scheduler
+    container_name: rabbitmq
+    hostname: rabbitmq
+
+  dask-scheduler:
+    image: ghcr.io/dask/dask:latest
+    command: ["dask", "scheduler"]
+    networks:
+      - analysis-net
+    container_name: scheduler
+    hostname: scheduler
 
   dask-worker:
-    image: daskdev/dask:latest
-    command: dask-worker dask-scheduler:8786
-    deploy:
-      replicas: 2
+    image: ghcr.io/dask/dask:latest
+    command: ["dask", "worker", "tcp://scheduler:8786"]
+    environment:
+      - DASK_SCHEDULER=tcp://scheduler:8786
+    depends_on:
+      - dask-scheduler
     networks:
       - analysis-net
+    deploy:
+      replicas: 2
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+    ports:
+      - "5000:5000" # Expose for direct access during development if needed
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DASK_SCHEDULER=tcp://scheduler:8786
+    depends_on:
+      - rabbitmq
+      - dask-scheduler
+    networks:
+      - analysis-net
+    container_name: backend
+    hostname: backend
+
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    ports:
+      - "881:80" # Map to port 881 as specified in documentation
+    depends_on:
+      - frontend
+      - backend
+      - rabbitmq
+      - dask-scheduler
+    networks:
+      - analysis-net
+    container_name: nginx
+    hostname: nginx
 
 networks:
   analysis-net:
     driver: bridge
-  nginx-proxy_default:
-    external: true
+
+volumes:
+  rabbitmq_data:
+    driver: local

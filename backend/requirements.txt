@@ -10,3 +10,31 @@ dask[distributed]
 dask[dataframe]
 dask[bag]
 gunicorn
+huggingface_hub[hf_xet]
+hf_xet
+lz4==4.3.3
+toolz==0.12.0
+# Added dependencies for refactored application
+pydantic
+python-dotenv
+pytest
+pytest-flask
+# Added for RabbitMQ integration
+pika
+# Added for FAISS index versioning
+GitPython
+tqdm
+psutil
+# Added for distributed indexing
+dask-ml
+fasteners
+# Added for Authentication System
+Flask-JWT-Extended
+bcrypt
+Flask-RBAC
+Flask-OAuthlib
+itsdangerous
+passlib
+python-jose[cryptography]
+Flask-Session
+requests

@@ -1,272 +1,306 @@
 import os
-import json
-import numpy as np
-from flask import Flask, request, jsonify
-from sentence_transformers import SentenceTransformer
-from dask.distributed import Client, Future
-import faiss
-from sklearn.cluster import KMeans
-import dask.bag as db
-import dask.dataframe as dd
-from dask.distributed import get_worker
-import queue
-import threading
-from datetime import datetime
-import pickle
+import logging
+from flask import Flask
+import time
+import secrets
+from flask_session import Session
 
-app = Flask(__name__)
-app.config.from_pyfile('config.py')
+from config import get_config
+from api import register_blueprints
+from api.error_handlers import register_error_handlers
+from services.embedding_service import ModelRegistry
+from services.index_service import IndexManager
+from services.queue_service import FileProcessingQueueService
+from services.queue_processor import QueueProcessor
+from services.message_broker import RabbitMQConnectionPool
+from services.file_processor_producer import FileProcessorProducer
+from services.file_processor_consumer import SupervisorProcess
+from services.index_version_manager import GitIndexVersionManager
+from services.index_health_monitor import IndexHealthMonitor
+from services.distributed_indexer import DaskDistributedIndexer
+from services.auth_service import AuthService
+from services.permission_middleware import PermissionMiddleware
+from services.oauth_integration import OAuthIntegration, create_google_provider
+from dask.distributed import Client
 
-# Initialize Dask
-client = Client()
 
-# Model Versioning
-MODEL_REGISTRY = {
-    'v1': 'all-MiniLM-L6-v2',
-    'v2': 'sentence-transformers/all-mpnet-base-v2'
-}
-CURRENT_MODEL = app.config['ACTIVE_MODEL']
+def setup_dask_client(app):
+    """Initialize Dask client for distributed processing
 
-# Load the correct model based on CURRENT_MODEL
-model = SentenceTransformer(MODEL_REGISTRY[CURRENT_MODEL])
+    Args:
+        app: Flask application instance
+    """
+    logger = logging.getLogger(__name__)
 
-# FAISS Index Management
-def get_active_index_path():
-    return os.path.join(app.config['FAISS_DIR'], f"indexes/{CURRENT_MODEL}/index.index")
-
-def get_active_index():
-    index_path = get_active_index_path()
-    if os.path.exists(index_path):
-        return faiss.read_index(index_path)
-    return faiss.IndexFlatL2(768)  # Embedding dimension
-
-faiss_index = get_active_index()
-index_lock = threading.Lock()
-
-# Batch Processing Queue
-processing_queue = queue.Queue()
-queue_file_path = os.path.join(app.config['QUEUES_DIR'], 'processing_queue.pkl')
-processing_lock = threading.Lock()
-
-# Try to load existing queue if it exists
-if os.path.exists(queue_file_path):
     try:
-        with open(queue_file_path, 'rb') as f:
-            pending_items = pickle.load(f)
-            for item in pending_items:
-                processing_queue.put(item)
+        app.dask_client = Client(address=app.config['DASK_SCHEDULER_ADDRESS'])
+        logger.info(f"Connected to Dask scheduler at {app.config['DASK_SCHEDULER_ADDRESS']}")
+
+        # Register clean-up
+        @app.teardown_appcontext
+        def close_dask_client(exception=None):
+            if hasattr(app, 'dask_client'):
+                app.dask_client.close()
+                logger.info("Closed Dask client connection")
+
     except Exception as e:
-        print(f"Error loading queue: {e}")
+        logger.warning(f"Failed to connect to Dask scheduler: {e}. Some distributed features may be unavailable.")
+        app.dask_client = None
 
-@app.route('/upload', methods=['POST'])
-def upload_files():
-    files = request.files.getlist("files")
-    task_id = str(datetime.now().timestamp())
 
-    # Add to processing queue
-    with processing_lock:
-        app.config['QUEUE_STATUS']['total'] += len(files)
-        for file in files:
-            processing_queue.put((file, task_id))
+def setup_rabbitmq_pool(app):
+    """Initialize RabbitMQ connection pool
 
-        # Persist queue to disk
-        try:
-            pending_items = list(processing_queue.queue)
-            with open(queue_file_path, 'wb') as f:
-                pickle.dump(pending_items, f)
-        except Exception as e:
-            print(f"Error saving queue: {e}")
+    Args:
+        app: Flask application instance
+    """
+    logger = logging.getLogger(__name__)
 
-    return jsonify({"task_id": task_id, "status": "queued", "files": len(files)})
+    try:
+        app.rabbitmq_pool = RabbitMQConnectionPool(
+            host=app.config['RABBITMQ_HOST'],
+            port=app.config['RABBITMQ_PORT'],
+            user=app.config['RABBITMQ_USER'],
+            password=app.config['RABBITMQ_PASSWORD'],
+            virtual_host=app.config['RABBITMQ_VHOST'],
+            connection_attempts=app.config['RABBITMQ_CONNECTION_ATTEMPTS'],
+            retry_delay=app.config['RABBITMQ_RETRY_DELAY'],
+            max_connections=app.config['RABBITMQ_MAX_CONNECTIONS']
+        )
+        logger.info(f"Initialized RabbitMQ connection pool for {app.config['RABBITMQ_HOST']}:{app.config['RABBITMQ_PORT']}")
+    except Exception as e:
+        logger.warning(f"Failed to initialize RabbitMQ connection pool: {e}. Message queue features will be unavailable.")
+        app.rabbitmq_pool = None
 
-@app.route('/status/<task_id>')
-def task_status(task_id):
-    # In a production system, we'd track each task separately
-    # For now, simply returning the queue status
-    return jsonify({
-        "task_id": task_id,
-        "status": "processing",
-        "queue_stats": app.config['QUEUE_STATUS']
-    })
 
-@app.route('/search', methods=['POST'])
-def search():
-    query = request.json.get('query')
-    k = request.json.get('k', 5)
+def setup_auth_system(app):
+    """Initialize Authentication System
 
-    # Generate query embedding
-    query_embedding = model.encode([query])[0]
+    Args:
+        app: Flask application instance
+    """
+    logger = logging.getLogger(__name__)
 
-    # FAISS Search
-    with index_lock:
-        distances, indices = faiss_index.search(
-            np.array([query_embedding], dtype='float32'),
-            k
+    try:
+        # Setup AuthService with JWT
+        secret_key = app.config.get('SECRET_KEY') or secrets.token_hex(32)
+        app.config['SECRET_KEY'] = secret_key  # Set it if it wasn't provided
+
+        token_expiry = app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)  # 1 hour default
+        refresh_expiry = app.config.get('JWT_REFRESH_TOKEN_EXPIRES', 86400 * 7)  # 7 days default
+
+        # Create auth service
+        app.auth_service = AuthService(
+            secret_key=secret_key,
+            token_expiry=token_expiry,
+            refresh_expiry=refresh_expiry
         )
 
-    results = []
-    for i, idx in enumerate(indices[0]):
-        if idx < 0 or idx >= faiss_index.ntotal:
-            continue
+        # Setup permission middleware
+        app.permission_middleware = PermissionMiddleware(app.auth_service)
+        app.permission_middleware.init_app(app)
 
-        # In a production system, we'd store document mappings
-        # For now, returning index and similarity score
-        results.append({
-            "document_id": int(idx),
-            "similarity": float(1 - distances[0][i]),
-            "cluster": 0  # Would be populated from clustering data
-        })
-
-    return jsonify(results)
-
-@app.route('/visualization', methods=['GET'])
-def get_visualization_data():
-    # Generate cluster statistics
-    # In a production system, we'd do proper clustering and dimensionality reduction
-
-    cluster_stats = [
-        {"name": "Cluster 1", "messages": 100, "sentiment": 0.8},
-        {"name": "Cluster 2", "messages": 75, "sentiment": 0.2},
-        {"name": "Cluster 3", "messages": 50, "sentiment": 0.5}
-    ]
-
-    projection_data = []
-
-    # Add some sample projection data
-    if faiss_index.ntotal > 0:
-        # Get a sample of the embeddings (max 1000)
-        sample_size = min(faiss_index.ntotal, 1000)
-        indices = np.random.choice(faiss_index.ntotal, size=sample_size, replace=False)
-
-        for i in indices:
-            projection_data.append({
-                "x": float(np.random.random()),  # In reality, this would be t-SNE output
-                "y": float(np.random.random()),
-                "cluster": int(np.random.randint(0, 3)),
-                "id": int(i)
-            })
-
-    return jsonify({
-        "clusters": cluster_stats,
-        "projection": projection_data
-    })
-
-@app.route('/models/switch/<version>')
-def switch_model(version):
-    if version in MODEL_REGISTRY:
-        global CURRENT_MODEL, model, faiss_index
-        CURRENT_MODEL = version
-        app.config['ACTIVE_MODEL'] = version
-
-        # Save to active_model.txt
-        active_model_path = os.path.join(app.config['MODELS_DIR'], 'active_model.txt')
-        with open(active_model_path, 'w') as f:
-            f.write(CURRENT_MODEL)
-
-        # Load the new model
-        model = SentenceTransformer(MODEL_REGISTRY[CURRENT_MODEL])
-
-        # Load the corresponding index
-        faiss_index = get_active_index()
-
-        return jsonify({"status": "success", "active_model": version})
-    return jsonify({"error": "Invalid model version"}), 400
-
-@app.route('/queue/status')
-def queue_status():
-    return jsonify({
-        "queue_length": processing_queue.qsize(),
-        "stats": app.config['QUEUE_STATUS']
-    })
-
-@app.route('/health')
-def health_check():
-    return jsonify({
-        "status": "healthy",
-        "model": CURRENT_MODEL,
-        "model_name": MODEL_REGISTRY[CURRENT_MODEL],
-        "index_size": faiss_index.ntotal,
-        "queue_length": processing_queue.qsize()
-    })
-
-def process_queue():
-    while True:
-        try:
-            # Get item from queue with 5-second timeout
-            file, task_id = processing_queue.get(timeout=5)
-
+        # Add default admin user in development mode
+        if app.config.get('ENV') == 'development':
             try:
-                # Read file contents
-                content = file.read()
+                admin_username = app.config.get('ADMIN_USERNAME', 'admin')
+                admin_password = app.config.get('ADMIN_PASSWORD', 'admin')
+                app.auth_service.create_user(
+                    username=admin_username,
+                    password=admin_password,
+                    roles=["admin"]
+                )
+                logger.info(f"Created default admin user: {admin_username}")
+            except ValueError:
+                logger.info(f"Admin user {app.config.get('ADMIN_USERNAME', 'admin')} already exists")
 
-                if isinstance(content, bytes):
-                    content = content.decode('utf-8')
+        # Setup OAuth integration if configured
+        if app.config.get('OAUTH_ENABLED', False):
+            app.session = Session()
+            app.session.init_app(app)
 
-                # Parse JSON if it's a JSON file
-                data = json.loads(content) if file.filename.endswith('.json') else {"text": content}
+            app.oauth_integration = OAuthIntegration(app.auth_service)
 
-                # Extract messages
-                messages = []
-                if "messages" in data:
-                    messages = [msg.get('content', '') for msg in data["messages"] if 'content' in msg]
-                elif "text" in data:
-                    messages = [data["text"]]
+            # Register Google provider if configured
+            if app.config.get('GOOGLE_CLIENT_ID') and app.config.get('GOOGLE_CLIENT_SECRET'):
+                google_provider = create_google_provider(
+                    app.config.get('GOOGLE_CLIENT_ID'),
+                    app.config.get('GOOGLE_CLIENT_SECRET')
+                )
+                app.oauth_integration.register_provider(google_provider)
+                logger.info("Registered Google OAuth provider")
 
-                if messages:
-                    # Generate embeddings with Dask
-                    future = client.submit(model.encode, messages)
-                    embeddings = future.result()
+            app.oauth_integration.init_app(app)
+            logger.info("OAuth integration initialized")
 
-                    # Add to FAISS index
-                    with index_lock:
-                        faiss_index.add(np.array(embeddings, dtype='float32'))
-                        index_path = get_active_index_path()
-                        os.makedirs(os.path.dirname(index_path), exist_ok=True)
-                        faiss.write_index(faiss_index, index_path)
+        logger.info("Authentication system initialized successfully")
 
-                # Update stats
-                with processing_lock:
-                    app.config['QUEUE_STATUS']['processed'] += 1
+    except Exception as e:
+        logger.error(f"Failed to initialize Authentication System: {e}")
+        raise
 
-            except Exception as e:
-                print(f"Error processing file {file.filename}: {e}")
-                with processing_lock:
-                    app.config['QUEUE_STATUS']['failed'] += 1
 
-            # Mark task as complete
-            processing_queue.task_done()
+def setup_logging(app):
+    """Configure logging
 
-            # Update persisted queue
-            with processing_lock:
-                pending_items = list(processing_queue.queue)
-                with open(queue_file_path, 'wb') as f:
-                    pickle.dump(pending_items, f)
+    Args:
+        app: Flask application instance
+    """
+    log_level = app.config.get('LOG_LEVEL', 'INFO')
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
-        except queue.Empty:
-            # Queue is empty, wait a bit
-            pass
-        except Exception as e:
-            print(f"Queue processing error: {e}")
 
-@app.before_request
-def manage_memory():
-    try:
-        worker = get_worker()
-        if hasattr(worker, 'memory') and worker.memory.used > app.config['MEMORY_LIMIT']:
-            worker.restart()
-    except:
-        # Not in a worker context or other error
-        pass
+def create_app(config_name=None):
+    """Create and configure the Flask application
 
-# Start queue processor
-queue_thread = threading.Thread(target=process_queue)
-queue_thread.daemon = True
-queue_thread.start()
+    Args:
+        config_name: Configuration name to use (development, production, testing)
+
+    Returns:
+        Flask application instance
+    """
+    app = Flask(__name__)
+
+    # Load configuration
+    app_config = get_config(config_name)
+    app.config.from_object(app_config)
+
+    # Set up logging
+    setup_logging(app)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Starting application with {config_name or 'default'} configuration")
+
+    # Initialize application directories and files
+    app_config.init_app(app)
+
+    # Set up Authentication System
+    setup_auth_system(app)
+
+    # Set up Dask client for distributed processing
+    setup_dask_client(app)
+
+    # Set up RabbitMQ connection pool
+    setup_rabbitmq_pool(app)
+
+    # Register error handlers
+    register_error_handlers(app)
+
+    # Initialize services
+    setup_services(app)
+
+    # Register blueprints
+    register_blueprints(app)
+
+    @app.route('/api/health')
+    @app.route('/health')
+    def health_check():
+        # Check RabbitMQ connection pool health
+        rabbitmq_health = app.rabbitmq_pool.health_check() if app.rabbitmq_pool else False
+
+        # Check index health
+        index_health = app.index_health_monitor.detect_corruption() if hasattr(app, 'index_health_monitor') else {"status": "unknown"}
+
+        return {
+            "status": "healthy",
+            "model": app.config['ACTIVE_MODEL'],
+            "model_name": ModelRegistry.MODELS[app.config['ACTIVE_MODEL']],
+            "index_size": app.index_service.get_total(),
+            "index_health": index_health["status"],
+            "queue_length": app.queue_service.get_queue_size(),
+            "rabbitmq": rabbitmq_health,
+            "auth_system": "active" if hasattr(app, 'auth_service') else "inactive"
+        }
+
+    @app.teardown_appcontext
+    def shutdown_app(exception=None):
+        if hasattr(app, 'rabbitmq_pool'):
+            app.rabbitmq_pool.close_all()
+
+        if hasattr(app, 'file_processor_supervisor'):
+            app.file_processor_supervisor.stop()
+
+        if hasattr(app, 'index_health_monitor'):
+            app.index_health_monitor.stop_monitoring()
+
+        # Clean up expired tokens periodically
+        if hasattr(app, 'auth_service'):
+            app.auth_service.clean_expired_tokens()
+
+    return app
+
+
+def setup_services(app):
+    """Initialize application services
+
+    Args:
+        app: Flask application instance
+    """
+    # Create embedding service
+    app.embedding_service = ModelRegistry.get_embedding_service(
+        app.config['ACTIVE_MODEL'],
+        app.dask_client
+    )
+
+    # Create index service
+    index_manager = IndexManager(app.config['FAISS_DIR'])
+    app.index_service = index_manager.get_index_service(
+        app.config['ACTIVE_MODEL'],
+        app.embedding_service.get_embedding_dimension()
+    )
+
+    # Create index version manager
+    app.index_version_manager = GitIndexVersionManager(app.config)
+
+    # Create index health monitor
+    app.index_health_monitor = IndexHealthMonitor(app.config)
+    app.index_health_monitor.start_monitoring()
+
+    # Create distributed indexer
+    app.distributed_indexer = DaskDistributedIndexer(app.config)
+
+    # Create queue service (legacy)
+    queue_file_path = os.path.join(app.config['QUEUES_DIR'], 'processing_queue.pkl')
+    app.queue_service = FileProcessingQueueService(queue_file_path)
+
+    # Set up legacy queue processor
+    if not hasattr(app, 'queue_processor') or app.queue_processor is None:
+        app.queue_processor = QueueProcessor(
+            app.queue_service,
+            app.embedding_service,
+            app.index_service
+        )
+        app.queue_processor.start()
+
+    # Set up file processor services using RabbitMQ
+    if app.rabbitmq_pool:
+        # Create task directory if needed
+        task_store_dir = os.path.join(app.config['QUEUES_DIR'], 'tasks')
+        os.makedirs(task_store_dir, exist_ok=True)
+
+        # Get a RabbitMQ connection from the pool
+        broker = app.rabbitmq_pool.get_connection()
+
+        # Create file processor producer
+        app.file_processor_producer = FileProcessorProducer(
+            broker,
+            task_store_dir
+        )
+
+        # Create file processor supervisor
+        if not hasattr(app, 'file_processor_supervisor') or app.file_processor_supervisor is None:
+            app.file_processor_supervisor = SupervisorProcess(
+                broker,
+                app.embedding_service,
+                app.index_service,
+                task_store_dir,
+                worker_count=3
+            )
+            app.file_processor_supervisor.start()
+
 
 if __name__ == '__main__':
-    app.config['QUEUE_STATUS'] = {
-        "total": 0,
-        "processed": 0,
-        "failed": 0
-    }
+    app = create_app()
     app.run(host='0.0.0.0', port=5000, threaded=True)
