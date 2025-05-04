@@ -91,7 +91,7 @@ services:
 volumes:
   - name: docker_sock
     host:
-      path: /var/lib/docker.sock
+      path: /var/run/docker.sock
   - name: docker-certs
     host:
       path: /home/drone/certs
