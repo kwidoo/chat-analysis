@@ -70,6 +70,7 @@ steps:
       FLASK_SECRET_KEY:
         from_secret: flask_secret_key
     commands:
+      - apk add --no-cache gettext
       - echo "Deploying application..."
       - envsubst < docker-compose.prod.yml > docker-compose.final.yml
       - docker-compose -f docker-compose.final.yml up -d
