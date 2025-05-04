@@ -44,28 +44,28 @@ services:
       replicas: 2
     restart: unless-stopped
   backend:
-      image: ${BACKEND_IMAGE}
-      runtime: nvidia
-      environment:
-          - FLASK_APP=app.py
-          - FLASK_ENV=production
-          - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
-          - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
-          - DASK_SCHEDULER=tcp://scheduler:8786
-          - NVIDIA_VISIBLE_DEVICES=all
-          - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      depends_on:
-          - rabbitmq
-          - dask-scheduler
-      networks:
-          - analysis-net
-      container_name: backend
-      hostname: backend
-      restart: unless-stopped
-      volumes:
-          - faiss_data:/app/faiss
-          - uploads_data:/app/uploads
-          - models_data:/app/models
+    image: ${BACKEND_IMAGE}
+    runtime: nvidia
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      - DASK_SCHEDULER=tcp://scheduler:8786
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    depends_on:
+      - rabbitmq
+      - dask-scheduler
+    networks:
+      - analysis-net
+    container_name: backend
+    hostname: backend
+    restart: unless-stopped
+    volumes:
+      - faiss_data:/app/faiss
+      - uploads_data:/app/uploads
+      - models_data:/app/models
   nginx:
     image: nginx:latest
     volumes:
@@ -76,7 +76,7 @@ services:
     networks:
       - analysis-net
     container_name: nginx
-    hostname: nginx
+    hostname: chat-analysis
     restart: unless-stopped
 
 networks:
