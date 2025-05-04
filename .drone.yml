@@ -59,8 +59,7 @@ steps:
     image: docker/compose:1.29.2
     environment:
       DOCKER_HOST: tcp://docker:2376
-      DOCKER_TLS_VERIFY: 1
-      DOCKER_CERT_PATH: /certs/client
+      DOCKER_TLS_VERIFY: 0
       BACKEND_IMAGE: ${DOCKER_REGISTRY}/${DRONE_REPO_OWNER}/chat-analysis-backend:${DRONE_COMMIT_SHA:0:8}
       FRONTEND_IMAGE: ${DOCKER_REGISTRY}/${DRONE_REPO_OWNER}/chat-analysis-frontend:${DRONE_COMMIT_SHA:0:8}
       RABBITMQ_USER:
