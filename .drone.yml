@@ -56,7 +56,7 @@ steps:
       branch:
         - main
   - name: deploy
-    image: docker/compose:2.35.1
+    image: docker/compose-bin:2.23.3 # Changed from docker/compose to docker/compose-bin
     environment:
       DOCKER_REGISTRY: docker.io
       BACKEND_IMAGE: docker.io/${DRONE_REPO_OWNER}/chat-analysis-backend:${DRONE_COMMIT_SHA:0:8}
