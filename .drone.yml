@@ -1,19 +1,16 @@
 kind: pipeline
 type: docker
 name: chat-analysis-system-pipeline
-
 node:
   worker: drone-ai
-
 steps:
   - name: test-backend
-    image: python:3.8
+    image: python:3.10
     commands:
       - cd backend
       - pip install -r requirements.txt
       - pip install pytest
       - pytest tests/
-
   - name: build-backend
     image: plugins/docker
     settings:
@@ -31,7 +28,6 @@ steps:
     when:
       branch:
         - main
-
   - name: build-frontend
     image: plugins/docker
     settings:
@@ -49,7 +45,6 @@ steps:
     when:
       branch:
         - main
-
   - name: deploy
     image: docker/compose:1.29.2
     environment:
@@ -76,7 +71,6 @@ steps:
     when:
       branch:
         - main
-
 services:
   - name: docker
     image: docker:dind
@@ -84,7 +78,6 @@ services:
     volumes:
       - name: docker-socket
         path: /var/run/docker.sock
-
 volumes:
   - name: docker-socket
     host:
@@ -92,7 +85,6 @@ volumes:
   - name: docker-certs
     host:
       path: /home/drone/certs
-
 trigger:
   branch:
     - main
