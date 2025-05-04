@@ -1,6 +1,6 @@
 kind: pipeline
 type: docker
-name: chat-analysis-system-pipeline
+name: chat-analysis
 node:
   machine: drone-ai
 
