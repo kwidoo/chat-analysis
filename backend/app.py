@@ -301,6 +301,10 @@ def setup_services(app):
             app.file_processor_supervisor.start()
 
 
+# Create a Flask application instance at the module level for Gunicorn
+app = create_app()
+
+
 if __name__ == '__main__':
-    app = create_app()
+    # Use the app instance that's already created
     app.run(host='0.0.0.0', port=5000, threaded=True)
