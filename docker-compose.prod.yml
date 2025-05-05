@@ -75,8 +75,6 @@ services:
     container_name: nginx
     hostname: chat-analysis
     restart: unless-stopped
-    ports:
-      - "80:80"
 networks:
   analysis-net:
     driver: bridge
