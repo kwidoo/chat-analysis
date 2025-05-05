@@ -14,5 +14,5 @@ COPY . .
 # Build the app
 RUN npm run build
 
-# Start the app
-CMD ["npm", "run", "preview"]
+# Start the app in development mode
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

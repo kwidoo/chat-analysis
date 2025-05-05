@@ -10,3 +10,4 @@ production-tasks.md
 refactoring-guidelines.md
 .venv
 __pycache__
+.env

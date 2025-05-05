@@ -13,16 +13,10 @@ export default defineConfig({
     publicDir: 'public',
     server: {
         port: 3000,
-        host: true,
+        host: '0.0.0.0', // Explicitly set host for development server
         strictPort: true,
         historyApiFallback: true,
-        proxy: {
-            '/api': {
-                target: 'http://backend:5000',
-                changeOrigin: true,
-                secure: false,
-            }
-        }
+        allowedHosts: ['ai1.home']
     },
     resolve: {
         alias: {
@@ -42,6 +36,6 @@ export default defineConfig({
         port: 3000,
         host: true,
         historyApiFallback: true,
-        allowedHosts: ['ai.pashkovsky.me']
+        allowedHosts: ['ai.pashkovsky.me', 'ai1.home', 'frontend']
     },
 });
