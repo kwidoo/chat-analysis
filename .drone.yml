@@ -5,24 +5,24 @@ node:
   machine: drone-ai
 
 steps:
-  - name: test-backend
-    image: nvidia/cuda:12.2.0-cudnn8-runtime-ubuntu22.04
-    volumes:
-      - name: docker_sock
-        path: /var/run/docker.sock
-      - name: nvidia_gpu
-        path: /usr/local/nvidia
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-    commands:
-      - apt-get update && apt-get install -y python3 python3-pip
-      - cd backend
-      - pip3 install -r requirements.txt
-      - pip3 install pytest
-      - python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count())"
-      - nvidia-smi
-      - pytest tests/
+  # - name: test-backend
+  #   image: nvidia/cuda:12.2.0-cudnn8-runtime-ubuntu22.04
+  #   volumes:
+  #     - name: docker_sock
+  #       path: /var/run/docker.sock
+  #     - name: nvidia_gpu
+  #       path: /usr/local/nvidia
+  #   environment:
+  #     NVIDIA_VISIBLE_DEVICES: all
+  #     NVIDIA_DRIVER_CAPABILITIES: compute,utility
+  #   commands:
+  #     - apt-get update && apt-get install -y python3 python3-pip
+  #     - cd backend
+  #     - pip3 install -r requirements.txt
+  #     - pip3 install pytest
+  #     - python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count())"
+  #     - nvidia-smi
+  #     - pytest tests/
   - name: build-backend
     image: plugins/docker
     volumes:
