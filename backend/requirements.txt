@@ -43,7 +43,7 @@ multipledispatch==1.0.0
 networkx==3.4.2
 nltk==3.9.1
 numba==0.61.2
-numpy==2.2.5
+numpy==1.26.4
 oauthlib==2.1.0
 packaging==25.0
 pandas==2.2.3
