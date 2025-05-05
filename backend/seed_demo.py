@@ -1,27 +1,38 @@
-from app import db
-from models.user import User  # Adjust import based on your actual model structure
-import hashlib
+from app import app
+import logging
 
 def seed():
-    """Create a demo user for testing purposes."""
-    # Check if demo user already exists
-    if not User.query.filter_by(email="demo@example.com").first():
-        # Create password hash - in a real app use werkzeug.security or similar
-        password_hash = hashlib.sha256("demo123".encode()).hexdigest()
+    """Create demo users for testing purposes."""
+    logger = logging.getLogger(__name__)
 
-        # Create user - adjust fields based on your User model
-        user = User(
-            email="demo@example.com",
-            password_hash=password_hash,
-            name="Demo User",
-            role="user"
-        )
+    try:
+        # Create a regular user
+        try:
+            app.auth_service.create_user(
+                username="demo@example.com",
+                password="demo123",
+                roles=["user"]
+            )
+            logger.info("Created demo user: demo@example.com")
+        except ValueError as e:
+            logger.info(f"Demo user may already exist: {e}")
 
-        db.session.add(user)
-        db.session.commit()
-        print("Demo user created successfully.")
-    else:
-        print("Demo user already exists.")
+        # Create an admin user
+        try:
+            app.auth_service.create_user(
+                username="admin@example.com",
+                password="admin123",
+                roles=["admin"]
+            )
+            logger.info("Created admin user: admin@example.com")
+        except ValueError as e:
+            logger.info(f"Admin user may already exist: {e}")
+
+        print("Seeding completed successfully!")
+
+    except Exception as e:
+        logger.error(f"Error seeding users: {e}")
+        print(f"Failed to seed users: {e}")
 
 if __name__ == "__main__":
     seed()

@@ -51,6 +51,132 @@ def search():
     return jsonify(results)
 
 
+@search_bp.route('/suggest', methods=['POST'])
+def suggest():
+    """Endpoint to provide search query suggestions based on user input.
+
+    Required JSON body parameters:
+    - input: Partial search query text for generating suggestions
+    """
+    data = request.json
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
+
+    input_text = data.get('input')
+    if not input_text or not isinstance(input_text, str):
+        return jsonify({"error": "Missing or invalid 'input' parameter"}), 400
+
+    # Get index service from app context
+    index_service = current_app.index_service
+
+    # Logic to generate suggestions
+    # This is a simplified implementation - in production, you might use:
+    # 1. Previously successful queries from a query log
+    # 2. Frequent terms from your index
+    # 3. Document titles or key phrases
+    # 4. An external suggestion service API
+
+    # Get some data from the index to base suggestions on
+    total_docs = index_service.get_total()
+    suggestions = []
+
+    if total_docs > 0:
+        # Generate suggestions based on the input
+        if input_text.lower().startswith('how'):
+            suggestions = [
+                f"{input_text} to implement search",
+                f"{input_text} to optimize indexing",
+                f"{input_text} to improve query performance"
+            ]
+        elif input_text.lower().startswith('what'):
+            suggestions = [
+                f"{input_text} is FAISS",
+                f"{input_text} are vector embeddings",
+                f"{input_text} is the best indexing strategy"
+            ]
+        else:
+            # Generic suggestions based on common search patterns
+            suggestions = [
+                f"{input_text} tutorial",
+                f"{input_text} implementation",
+                f"{input_text} best practices",
+                f"{input_text} examples"
+            ]
+
+    return jsonify({"suggestions": suggestions})
+
+
+@search_bp.route('/process-nl', methods=['POST'])
+def process_natural_language():
+    """Endpoint to transform natural language queries into structured queries.
+
+    Required JSON body parameters:
+    - query: Natural language text to transform into a structured query
+    """
+    data = request.json
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
+
+    query = data.get('query')
+    if not query or not isinstance(query, str):
+        return jsonify({"error": "Missing or invalid 'query' parameter"}), 400
+
+    # Process the natural language query
+    # This is a simplified implementation - in production, you might use:
+    # 1. NLP libraries to extract entities, intent, etc.
+    # 2. A language model to transform the query
+    # 3. Rule-based transformations for common patterns
+
+    structured_query = {
+        "type": "semantic",
+        "text": query,
+        "filters": [],
+        "boost": []
+    }
+
+    # Detect filtering intention
+    lower_query = query.lower()
+
+    # Check for time filters
+    if any(term in lower_query for term in ["today", "recent", "latest"]):
+        structured_query["filters"].append({
+            "field": "timestamp",
+            "operator": "gte",
+            "value": "now-1d" # Last 24 hours
+        })
+    elif "yesterday" in lower_query:
+        structured_query["filters"].append({
+            "field": "timestamp",
+            "operator": "range",
+            "value": {"gte": "now-2d", "lt": "now-1d"}
+        })
+    elif "this week" in lower_query:
+        structured_query["filters"].append({
+            "field": "timestamp",
+            "operator": "gte",
+            "value": "now-7d"
+        })
+
+    # Check for type filters
+    if "document" in lower_query or "doc" in lower_query:
+        structured_query["filters"].append({
+            "field": "type",
+            "operator": "eq",
+            "value": "document"
+        })
+    elif "image" in lower_query or "photo" in lower_query:
+        structured_query["filters"].append({
+            "field": "type",
+            "operator": "eq",
+            "value": "image"
+        })
+
+    return jsonify({
+        "original_query": query,
+        "structured_query": structured_query
+    })
+
+
 @search_bp.route('/visualization', methods=['GET'])
 def get_visualization_data():
     """Endpoint to get data for visualization"""

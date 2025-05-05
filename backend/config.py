@@ -1,6 +1,7 @@
 # File: backend/config.py
 import os
 import secrets
+import urllib.parse
 from pydantic import BaseModel, validator
 from typing import Dict, Any, Optional, List
 
@@ -20,14 +21,14 @@ class AppConfig(BaseModel):
     QUEUE_STATUS: Dict[str, int] = {"total": 0, "processed": 0, "failed": 0}
 
     # RabbitMQ Configuration
-    RABBITMQ_HOST: str = "localhost"
-    RABBITMQ_PORT: int = 5672
-    RABBITMQ_USER: str = "guest"
-    RABBITMQ_PASSWORD: str = "guest"
-    RABBITMQ_VHOST: str = "/"
-    RABBITMQ_CONNECTION_ATTEMPTS: int = 5
-    RABBITMQ_RETRY_DELAY: int = 5
-    RABBITMQ_MAX_CONNECTIONS: int = 10
+    RABBITMQ_HOST: str
+    RABBITMQ_PORT: int
+    RABBITMQ_USER: str
+    RABBITMQ_PASSWORD: str
+    RABBITMQ_VHOST: str
+    RABBITMQ_CONNECTION_ATTEMPTS: int
+    RABBITMQ_RETRY_DELAY: int
+    RABBITMQ_MAX_CONNECTIONS: int
 
     # Authentication System Configuration
     SECRET_KEY: Optional[str] = None
@@ -51,69 +52,52 @@ class AppConfig(BaseModel):
 
 
 class Config:
-    """Base configuration class"""
+    """Base configuration class - defines defaults and structure"""
     APP_DIR = os.path.dirname(__file__)
     DATA_DIR = os.path.join(APP_DIR, 'faiss')
     UPLOAD_DIR = os.path.join(APP_DIR, 'uploads')
-    DASK_SCHEDULER_ADDRESS = 'tcp://dask-scheduler:8786'
+    DASK_SCHEDULER_ADDRESS = 'tcp://dask-scheduler:8786' # Default for containers
     FAISS_DIR = os.path.join(APP_DIR, 'faiss')
     FAISS_LOCK_FILE = os.path.join(FAISS_DIR, 'index.lock')
     MODELS_DIR = os.path.join(APP_DIR, 'models')
     QUEUES_DIR = os.path.join(APP_DIR, 'queues')
-    ACTIVE_MODEL = os.environ.get('ACTIVE_MODEL', 'v1')
+    ACTIVE_MODEL = 'v1' # Default
 
     # Memory management
     MEMORY_LIMIT = "4GB"
-    GC_INTERVAL = 300  # seconds
+    GC_INTERVAL = 300
 
     # Queue monitoring
-    QUEUE_STATUS = {
-        "total": 0,
-        "processed": 0,
-        "failed": 0
-    }
+    QUEUE_STATUS = {"total": 0, "processed": 0, "failed": 0}
 
-    # RabbitMQ Configuration
-    RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
-    RABBITMQ_PORT = int(os.environ.get("RABBITMQ_PORT", 5672))
-    RABBITMQ_USER = os.environ.get("RABBITMQ_USER", "guest")
-    RABBITMQ_PASSWORD = os.environ.get("RABBITMQ_PASSWORD", "guest")
-    RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", "/")
-    RABBITMQ_CONNECTION_ATTEMPTS = int(os.environ.get("RABBITMQ_CONNECTION_ATTEMPTS", 5))
-    RABBITMQ_RETRY_DELAY = int(os.environ.get("RABBITMQ_RETRY_DELAY", 5))
-    RABBITMQ_MAX_CONNECTIONS = int(os.environ.get("RABBITMQ_MAX_CONNECTIONS", 10))
+    # Default RabbitMQ settings (will be overridden by get_config_object logic)
+    RABBITMQ_HOST = "localhost"
+    RABBITMQ_PORT = 5672
+    RABBITMQ_USER = "guest"
+    RABBITMQ_PASSWORD = "guest"
+    RABBITMQ_VHOST = "/"
+    RABBITMQ_CONNECTION_ATTEMPTS = 5
+    RABBITMQ_RETRY_DELAY = 5
+    RABBITMQ_MAX_CONNECTIONS = 10
 
-    # Authentication System Configuration
-    SECRET_KEY = os.environ.get("SECRET_KEY")
-    JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRES", 3600))  # 1 hour
-    JWT_REFRESH_TOKEN_EXPIRES = int(os.environ.get("JWT_REFRESH_TOKEN_EXPIRES", 604800))  # 7 days
-    OAUTH_ENABLED = os.environ.get("OAUTH_ENABLED", "False").lower() in ("true", "1", "t")
-    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
-    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
-    GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID")
-    GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET")
-    SESSION_TYPE = os.environ.get("SESSION_TYPE", "filesystem")
-    ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
-    ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
-    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:8080").split(",")
-
-    @classmethod
-    def get_config_dict(cls):
-        """Convert config to dictionary for validation"""
-        return {
-            key: value for key, value in vars(cls).items()
-            if not key.startswith('__') and not callable(value)
-        }
-
-    @staticmethod
-    def validate_config(config_dict):
-        """Validate config using pydantic"""
-        return AppConfig(**config_dict)
+    # Authentication System Configuration Defaults
+    SECRET_KEY = None
+    JWT_ACCESS_TOKEN_EXPIRES = 3600
+    JWT_REFRESH_TOKEN_EXPIRES = 604800
+    OAUTH_ENABLED = False
+    GOOGLE_CLIENT_ID = None
+    GOOGLE_CLIENT_SECRET = None
+    GITHUB_CLIENT_ID = None
+    GITHUB_CLIENT_SECRET = None
+    SESSION_TYPE = "filesystem"
+    ADMIN_USERNAME = "admin"
+    ADMIN_PASSWORD = "admin"
+    CORS_ORIGINS = ["http://localhost:3000", "http://localhost:8080"]
 
     @staticmethod
     def init_app(app):
         """Initialize application directories and files"""
-        # Create necessary directories
+        # Create necessary directories using app.config values
         os.makedirs(app.config['DATA_DIR'], exist_ok=True)
         os.makedirs(app.config['UPLOAD_DIR'], exist_ok=True)
         os.makedirs(app.config['MODELS_DIR'], exist_ok=True)
@@ -128,59 +112,46 @@ class Config:
 
         # Create directory for Flask sessions if using filesystem session type
         if app.config.get('SESSION_TYPE') == 'filesystem':
-            os.makedirs(os.path.join(app.config['APP_DIR'], 'flask_sessions'), exist_ok=True)
+            flask_session_dir = os.path.join(app.config['APP_DIR'], 'flask_sessions')
+            os.makedirs(flask_session_dir, exist_ok=True)
+            app.config['SESSION_FILE_DIR'] = flask_session_dir
 
 
 class DevelopmentConfig(Config):
-    """Development configuration"""
+    """Development specific settings"""
     DEBUG = True
     TESTING = False
-    MEMORY_LIMIT = "2GB"  # Lower memory limit for development
-    RABBITMQ_HOST = "localhost"
-
-    # Development auth settings
-    SECRET_KEY = "dev-secret-key"  # Only for development!
-    OAUTH_ENABLED = True  # Enable OAuth in development for testing
+    MEMORY_LIMIT = "2GB"
+    SECRET_KEY = "dev-secret-key" # Override default
+    OAUTH_ENABLED = True # Override default
 
 
 class TestingConfig(Config):
-    """Testing configuration"""
+    """Testing specific settings"""
     DEBUG = False
     TESTING = True
-    DASK_SCHEDULER_ADDRESS = 'tcp://localhost:8786'
-    # Use in-memory or temporary file storage for testing
+    DASK_SCHEDULER_ADDRESS = 'tcp://localhost:8786' # Override for local testing
+    # Use temporary directories for testing
     DATA_DIR = '/tmp/faiss_test'
     UPLOAD_DIR = '/tmp/uploads_test'
     FAISS_DIR = '/tmp/faiss_test'
     MODELS_DIR = '/tmp/models_test'
     QUEUES_DIR = '/tmp/queues_test'
-    # Use local RabbitMQ for testing
-    RABBITMQ_HOST = "localhost"
-
-    # Testing auth settings
-    SECRET_KEY = "test-secret-key"  # Only for testing!
-    JWT_ACCESS_TOKEN_EXPIRES = 60  # Short expiry for testing
-    JWT_REFRESH_TOKEN_EXPIRES = 300  # Short refresh expiry for testing
-    SESSION_TYPE = "filesystem"
+    SECRET_KEY = "test-secret-key" # Override default
+    JWT_ACCESS_TOKEN_EXPIRES = 60
+    JWT_REFRESH_TOKEN_EXPIRES = 300
 
 
 class ProductionConfig(Config):
-    """Production configuration"""
+    """Production specific settings"""
     DEBUG = False
     TESTING = False
-    # In production, consider using environment variables for sensitive settings
-    DASK_SCHEDULER_ADDRESS = os.environ.get('DASK_SCHEDULER_ADDRESS', 'tcp://dask-scheduler:8786')
-    MEMORY_LIMIT = os.environ.get('MEMORY_LIMIT', "8GB")
-    # RabbitMQ settings from environment variables (already handled in base class)
-
-    # Production auth settings
-    SECRET_KEY = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-    OAUTH_ENABLED = os.environ.get("OAUTH_ENABLED", "False").lower() in ("true", "1", "t")
-    SESSION_TYPE = os.environ.get("SESSION_TYPE", "redis")  # Use Redis for production
+    MEMORY_LIMIT = "8GB" # Override default
+    SESSION_TYPE = "redis" # Override default
 
 
 # Configuration mapping
-config_by_name = {
+config_by_name: Dict[str, type[Config]] = {
     'development': DevelopmentConfig,
     'testing': TestingConfig,
     'production': ProductionConfig,
@@ -188,15 +159,109 @@ config_by_name = {
 }
 
 
-def get_config(config_name=None):
-    """Get configuration based on environment name"""
+def get_config_object(config_name: Optional[str] = None) -> Config:
+    """
+    Get configuration object based on environment name, applying environment variables.
+    Returns an *instance* of the config class with final values.
+    """
     if not config_name:
         config_name = os.environ.get('FLASK_ENV', 'default')
 
-    config_class = config_by_name.get(config_name, config_by_name['default'])
-    config_dict = config_class.get_config_dict()
+    # Get the appropriate config class
+    ConfigClass = config_by_name.get(config_name, config_by_name['default'])
 
-    # Validate config
-    validated_config = Config.validate_config(config_dict)
+    # Create an instance to hold the config values
+    config_instance = ConfigClass()
 
-    return config_class
+    # --- Apply Environment Variables ---
+
+    # Core settings
+    config_instance.ACTIVE_MODEL = os.environ.get('ACTIVE_MODEL', config_instance.ACTIVE_MODEL)
+    config_instance.MEMORY_LIMIT = os.environ.get('MEMORY_LIMIT', config_instance.MEMORY_LIMIT)
+    config_instance.DASK_SCHEDULER_ADDRESS = os.environ.get('DASK_SCHEDULER_ADDRESS', config_instance.DASK_SCHEDULER_ADDRESS)
+
+    # RabbitMQ - Prioritize URL, then individual vars, then class defaults
+    rabbitmq_url = os.environ.get("RABBITMQ_URL")
+    if rabbitmq_url:
+        try:
+            parsed_url = urllib.parse.urlparse(rabbitmq_url)
+            config_instance.RABBITMQ_HOST = parsed_url.hostname or config_instance.RABBITMQ_HOST
+            config_instance.RABBITMQ_PORT = parsed_url.port or config_instance.RABBITMQ_PORT
+            config_instance.RABBITMQ_USER = parsed_url.username or config_instance.RABBITMQ_USER
+            config_instance.RABBITMQ_PASSWORD = parsed_url.password or config_instance.RABBITMQ_PASSWORD
+            config_instance.RABBITMQ_VHOST = parsed_url.path.lstrip('/') or config_instance.RABBITMQ_VHOST
+        except Exception as e:
+            print(f"Warning: Could not parse RABBITMQ_URL: {e}. Falling back to defaults/other env vars.")
+            # Fallback to individual env vars if URL parsing fails
+            config_instance.RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", config_instance.RABBITMQ_HOST)
+            config_instance.RABBITMQ_PORT = int(os.environ.get("RABBITMQ_PORT", config_instance.RABBITMQ_PORT))
+            config_instance.RABBITMQ_USER = os.environ.get("RABBITMQ_USER", config_instance.RABBITMQ_USER)
+            config_instance.RABBITMQ_PASSWORD = os.environ.get("RABBITMQ_PASSWORD", config_instance.RABBITMQ_PASSWORD)
+            config_instance.RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", config_instance.RABBITMQ_VHOST)
+    else:
+        # If no URL, use individual env vars or defaults
+        config_instance.RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", config_instance.RABBITMQ_HOST)
+        config_instance.RABBITMQ_PORT = int(os.environ.get("RABBITMQ_PORT", config_instance.RABBITMQ_PORT))
+        config_instance.RABBITMQ_USER = os.environ.get("RABBITMQ_USER", config_instance.RABBITMQ_USER)
+        config_instance.RABBITMQ_PASSWORD = os.environ.get("RABBITMQ_PASSWORD", config_instance.RABBITMQ_PASSWORD)
+        config_instance.RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", config_instance.RABBITMQ_VHOST)
+
+    config_instance.RABBITMQ_CONNECTION_ATTEMPTS = int(os.environ.get("RABBITMQ_CONNECTION_ATTEMPTS", config_instance.RABBITMQ_CONNECTION_ATTEMPTS))
+    config_instance.RABBITMQ_RETRY_DELAY = int(os.environ.get("RABBITMQ_RETRY_DELAY", config_instance.RABBITMQ_RETRY_DELAY))
+    config_instance.RABBITMQ_MAX_CONNECTIONS = int(os.environ.get("RABBITMQ_MAX_CONNECTIONS", config_instance.RABBITMQ_MAX_CONNECTIONS))
+
+    # Authentication
+    # Use secrets.token_hex only if SECRET_KEY is not set by env var *and* not overridden by subclass
+    default_secret = secrets.token_hex(32) if config_name == 'production' and ConfigClass.SECRET_KEY is None else ConfigClass.SECRET_KEY
+    config_instance.SECRET_KEY = os.environ.get("SECRET_KEY", default_secret)
+
+    config_instance.JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRES", config_instance.JWT_ACCESS_TOKEN_EXPIRES))
+    config_instance.JWT_REFRESH_TOKEN_EXPIRES = int(os.environ.get("JWT_REFRESH_TOKEN_EXPIRES", config_instance.JWT_REFRESH_TOKEN_EXPIRES))
+    # Handle boolean conversion carefully for OAUTH_ENABLED
+    oauth_env = os.environ.get("OAUTH_ENABLED")
+    if oauth_env is not None:
+         config_instance.OAUTH_ENABLED = oauth_env.lower() in ("true", "1", "t")
+    # else: it keeps the value from the ConfigClass instance
+
+    config_instance.GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", config_instance.GOOGLE_CLIENT_ID)
+    config_instance.GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", config_instance.GOOGLE_CLIENT_SECRET)
+    config_instance.GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", config_instance.GITHUB_CLIENT_ID)
+    config_instance.GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", config_instance.GITHUB_CLIENT_SECRET)
+    config_instance.SESSION_TYPE = os.environ.get("SESSION_TYPE", config_instance.SESSION_TYPE)
+    config_instance.ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", config_instance.ADMIN_USERNAME)
+    config_instance.ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", config_instance.ADMIN_PASSWORD)
+    config_instance.CORS_ORIGINS = os.environ.get("CORS_ORIGINS", ",".join(config_instance.CORS_ORIGINS)).split(",")
+
+
+    # --- Validate Config ---
+    # Convert instance attributes to dict for Pydantic validation
+    config_dict = {key: getattr(config_instance, key)
+                   for key in AppConfig.model_fields
+                   if hasattr(config_instance, key)}
+
+    try:
+        AppConfig(**config_dict) # Validate against AppConfig model
+        print(f"Configuration loaded successfully for '{config_name}':")
+        # print(f"  RABBITMQ_HOST: {config_instance.RABBITMQ_HOST}") # Debug print
+        # print(f"  RABBITMQ_PORT: {config_instance.RABBITMQ_PORT}") # Debug print
+    except Exception as e:
+        print(f"Configuration validation failed for {config_name} ({ConfigClass.__name__})")
+        print(f"Config dictionary provided for validation: {config_dict}")
+        raise e # Re-raise the validation error
+
+    return config_instance # Return the populated instance
+
+
+# Keep the old get_config function signature for compatibility if needed elsewhere,
+# but make it use the new logic. Flask expects from_object to work with classes or objects.
+# Returning the instance is generally safer for applying env vars correctly.
+def get_config(config_name=None):
+     """
+     Legacy wrapper for compatibility. Returns the config *class* after ensuring
+     an instance created with get_config_object validates correctly.
+     Flask's from_object can handle classes, but this ensures validation runs.
+     """
+     # Run validation by creating an instance
+     validated_instance = get_config_object(config_name)
+     # Return the class that was used to create the instance
+     return validated_instance.__class__

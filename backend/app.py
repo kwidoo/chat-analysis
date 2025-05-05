@@ -4,8 +4,9 @@ from flask import Flask
 import time
 import secrets
 from flask_session import Session
+import urllib.parse
 
-from config import get_config
+from config import get_config, get_config_object, Config
 from api import register_blueprints
 from api.error_handlers import register_error_handlers
 from services.embedding_service import ModelRegistry
@@ -56,13 +57,20 @@ def setup_rabbitmq_pool(app):
     """
     logger = logging.getLogger(__name__)
 
+    # Log the config values being used for RabbitMQ connection
+    rmq_host = app.config.get('RABBITMQ_HOST')
+    rmq_port = app.config.get('RABBITMQ_PORT')
+    rmq_user = app.config.get('RABBITMQ_USER')
+    rmq_vhost = app.config.get('RABBITMQ_VHOST')
+    logger.info(f"Attempting to setup RabbitMQ pool with Host: {rmq_host}, Port: {rmq_port}, User: {rmq_user}, VHost: {rmq_vhost}")
+
     try:
         app.rabbitmq_pool = RabbitMQConnectionPool(
-            host=app.config['RABBITMQ_HOST'],
-            port=app.config['RABBITMQ_PORT'],
-            user=app.config['RABBITMQ_USER'],
-            password=app.config['RABBITMQ_PASSWORD'],
-            virtual_host=app.config['RABBITMQ_VHOST'],
+            host=rmq_host, # Use the retrieved variable
+            port=rmq_port, # Use the retrieved variable
+            user=rmq_user, # Use the retrieved variable
+            password=app.config['RABBITMQ_PASSWORD'], # Password might be sensitive, get directly
+            virtual_host=rmq_vhost, # Use the retrieved variable
             connection_attempts=app.config['RABBITMQ_CONNECTION_ATTEMPTS'],
             retry_delay=app.config['RABBITMQ_RETRY_DELAY'],
             max_connections=app.config['RABBITMQ_MAX_CONNECTIONS']
@@ -130,6 +138,16 @@ def setup_auth_system(app):
                 app.oauth_integration.register_provider(google_provider)
                 logger.info("Registered Google OAuth provider")
 
+            # Register GitHub provider if configured
+            if app.config.get('GITHUB_CLIENT_ID') and app.config.get('GITHUB_CLIENT_SECRET'):
+                from services.oauth_integration import create_github_provider
+                github_provider = create_github_provider(
+                    app.config.get('GITHUB_CLIENT_ID'),
+                    app.config.get('GITHUB_CLIENT_SECRET')
+                )
+                app.oauth_integration.register_provider(github_provider)
+                logger.info("Registered GitHub OAuth provider")
+
             app.oauth_integration.init_app(app)
             logger.info("OAuth integration initialized")
 
@@ -153,6 +171,20 @@ def setup_logging(app):
     )
 
 
+def setup_route_aliases(app):
+    """Set up route aliases for the application
+
+    Args:
+        app: Flask application instance
+    """
+    from flask import redirect, request
+
+    @app.route('/api/upload', methods=['POST'])
+    def upload_alias():
+        # Forward the request to the files upload endpoint
+        return app.view_functions['files.upload_files']()
+
+
 def create_app(config_name=None):
     """Create and configure the Flask application
 
@@ -164,17 +196,42 @@ def create_app(config_name=None):
     """
     app = Flask(__name__)
 
-    # Load configuration
-    app_config = get_config(config_name)
-    app.config.from_object(app_config)
+    # Load configuration using the instance from get_config_object
+    app_config_instance = get_config_object(config_name)  # New way using instance
+    app.config.from_object(app_config_instance)  # Load from the instance
+
+    # --- Explicitly apply RabbitMQ URL from environment AFTER loading config object ---
+    rabbitmq_url_env = os.environ.get("RABBITMQ_URL")
+    if rabbitmq_url_env:
+        try:
+            parsed_url = urllib.parse.urlparse(rabbitmq_url_env)
+            if parsed_url.hostname:
+                app.config['RABBITMQ_HOST'] = parsed_url.hostname
+            if parsed_url.port:
+                app.config['RABBITMQ_PORT'] = parsed_url.port
+            if parsed_url.username:
+                app.config['RABBITMQ_USER'] = parsed_url.username
+            if parsed_url.password:
+                app.config['RABBITMQ_PASSWORD'] = parsed_url.password
+            vhost = parsed_url.path.lstrip('/')
+            if vhost: # Only update if vhost is not empty in URL
+                app.config['RABBITMQ_VHOST'] = vhost
+            # Note: Connection attempts, retry delay, max connections still come from config object/defaults
+        except Exception as e:
+            # Log if parsing fails, but proceed with potentially default/other env var values
+            logging.getLogger(__name__).warning(f"Could not parse RABBITMQ_URL in create_app: {e}")
+    # --- End of explicit RabbitMQ URL override ---
 
     # Set up logging
     setup_logging(app)
     logger = logging.getLogger(__name__)
-    logger.info(f"Starting application with {config_name or 'default'} configuration")
+    # Use the actual config name used
+    actual_config_name = os.environ.get('FLASK_ENV', 'default') if config_name is None else config_name
+    logger.info(f"Starting application with {actual_config_name} configuration")
 
-    # Initialize application directories and files
-    app_config.init_app(app)
+    # Initialize application directories and files using the base Config class method
+    # Note: init_app uses app.config which is now correctly populated
+    Config.init_app(app)
 
     # Set up Authentication System
     setup_auth_system(app)
@@ -183,6 +240,7 @@ def create_app(config_name=None):
     setup_dask_client(app)
 
     # Set up RabbitMQ connection pool
+    # This will now use the correct values from app.config
     setup_rabbitmq_pool(app)
 
     # Register error handlers
@@ -193,6 +251,9 @@ def create_app(config_name=None):
 
     # Register blueprints
     register_blueprints(app)
+
+    # Add route alias for upload endpoint
+    setup_route_aliases(app)
 
     @app.route('/api/health')
     @app.route('/health')

@@ -1,7 +1,8 @@
 from flask import current_app, jsonify, request, g
+import pyotp
 
 from api.blueprints.auth import auth_bp
-from services.auth_service import UserCredentials
+from services.auth_service import UserCredentials, MFAVerification
 from services.permission_middleware import requires_auth
 
 
@@ -40,24 +41,55 @@ def login():
         user_data = UserCredentials(**data)
 
         # Authenticate user
-        user = current_app.auth_service.authenticate(
+        auth_result = current_app.auth_service.authenticate(
             username=user_data.username,
             password=user_data.password
         )
 
-        if not user:
+        if not auth_result:
             return jsonify({"error": "Invalid credentials"}), 401
 
-        # Generate tokens
-        tokens = current_app.auth_service.generate_token_pair(user)
+        # Check if MFA is required
+        if auth_result.get("requires_mfa", False):
+            return jsonify({
+                "message": "MFA verification required",
+                "requires_mfa": True,
+                "mfa_token": auth_result.get("mfa_token")
+            }), 200
 
+        # No MFA required, return tokens
         return jsonify({
             "message": "Login successful",
-            **tokens
+            **auth_result
         })
 
     except Exception as e:
         return jsonify({"error": "Login failed"}), 500
+
+
+@auth_bp.route('/verify-mfa', methods=['POST'])
+def verify_mfa():
+    """Validate MFA code and issue JWT tokens upon successful verification."""
+    try:
+        data = request.json
+        mfa_data = MFAVerification(**data)
+
+        # Verify the MFA code
+        tokens = current_app.auth_service.verify_mfa(
+            mfa_token=mfa_data.mfa_token,
+            mfa_code=mfa_data.mfa_code
+        )
+
+        if not tokens:
+            return jsonify({"error": "Invalid or expired MFA code"}), 401
+
+        return jsonify({
+            "message": "MFA verification successful",
+            **tokens
+        })
+
+    except Exception as e:
+        return jsonify({"error": "MFA verification failed"}), 500
 
 
 @auth_bp.route('/refresh', methods=['POST'])
@@ -127,6 +159,37 @@ def get_profile():
 
     except Exception as e:
         return jsonify({"error": "Failed to get user profile"}), 500
+
+
+@auth_bp.route('/enable-mfa', methods=['POST'])
+@requires_auth()
+def enable_mfa():
+    """Enable MFA for the authenticated user."""
+    try:
+        # User ID is stored in g.user_id by the requires_auth decorator
+        user_id = g.user_id
+
+        # Enable MFA and get the secret key
+        secret = current_app.auth_service.enable_mfa(user_id)
+
+        if not secret:
+            return jsonify({"error": "Failed to enable MFA"}), 500
+
+        # Generate URI for QR code generation on the client
+        user = current_app.auth_service.get_user_by_id(user_id)
+        uri = pyotp.totp.TOTP(secret).provisioning_uri(
+            name=user.username,
+            issuer_name=current_app.config.get('MFA_ISSUER_NAME', 'AI3 Application')
+        )
+
+        return jsonify({
+            "message": "MFA enabled successfully",
+            "secret": secret,
+            "uri": uri
+        })
+
+    except Exception as e:
+        return jsonify({"error": "Failed to enable MFA"}), 500
 
 
 @auth_bp.route('/roles', methods=['GET'])

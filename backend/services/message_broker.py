@@ -67,7 +67,7 @@ class RabbitMQBroker(MessageBrokerInterface):
                  user: str = 'guest', password: str = 'guest',
                  virtual_host: str = '/', connection_attempts: int = 5,
                  retry_delay: int = 5):
-        """Initialize RabbitMQ connection
+        """Initialize RabbitMQ connection parameters (DOES NOT connect immediately)
 
         Args:
             host: RabbitMQ host
@@ -90,7 +90,7 @@ class RabbitMQBroker(MessageBrokerInterface):
         self._channel = None
         self._consuming = False
         self._connection_lock = threading.Lock()
-        self._connect()
+        # REMOVED self._connect() call from __init__
 
     def _connect(self) -> bool:
         """Establish a connection to RabbitMQ
@@ -130,11 +130,17 @@ class RabbitMQBroker(MessageBrokerInterface):
         """Ensure that there is an active connection to RabbitMQ
 
         Returns:
-            True if connection is active, False otherwise
+            True if connection is active or successfully established, False otherwise
         """
+        # Check if already connected without lock first for performance
         if self.is_connected:
             return True
-        return self._connect()
+        # If not connected, acquire lock and try to connect
+        with self._connection_lock:
+            # Double-check connection status after acquiring lock
+            if self.is_connected:
+                return True
+            return self._connect()  # Attempt connection
 
     def _close_connection(self) -> None:
         """Close the RabbitMQ connection"""

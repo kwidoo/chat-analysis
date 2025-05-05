@@ -1,5 +1,7 @@
 import datetime
 import uuid
+import secrets
+import pyotp
 from typing import Dict, List, Optional, Tuple, Any
 
 import bcrypt
@@ -23,6 +25,11 @@ class UserCredentials(BaseModel):
     password: str
 
 
+class MFAVerification(BaseModel):
+    mfa_token: str
+    mfa_code: str
+
+
 class User(BaseModel):
     id: str
     username: str
@@ -30,6 +37,8 @@ class User(BaseModel):
     active: bool
     roles: List[str] = []
     refresh_tokens: Dict[str, Dict] = {}  # token_id -> {exp, revoked}
+    mfa_secret: Optional[str] = None
+    mfa_enabled: bool = False
 
 
 class AuthService:
@@ -48,6 +57,7 @@ class AuthService:
         self.token_expiry = token_expiry
         self.refresh_expiry = refresh_expiry
         self._users = {}  # In-memory user store (replace with DB in production)
+        self._mfa_pending = {}  # Store MFA challenges temporarily
 
     def create_user(self, username: str, password: str, roles: List[str] = ["user"]) -> User:
         """Create a new user with the given credentials and roles."""
@@ -69,14 +79,82 @@ class AuthService:
         self._users[user_id] = user
         return user
 
-    def authenticate(self, username: str, password: str) -> Optional[User]:
+    def authenticate(self, username: str, password: str) -> Optional[Dict]:
         """Authenticate a user with the given credentials."""
         user = next((u for u in self._users.values() if u.username == username and u.active), None)
 
-        if user and bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
-            return user
+        if not user or not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+            return None
 
-        return None
+        # If MFA is enabled, return MFA challenge instead of tokens
+        if user.mfa_enabled:
+            mfa_token = self._create_mfa_challenge(user)
+            return {
+                "requires_mfa": True,
+                "mfa_token": mfa_token
+            }
+
+        # If no MFA required, generate tokens directly
+        return {
+            "requires_mfa": False,
+            **self.generate_token_pair(user)
+        }
+
+    def _create_mfa_challenge(self, user: User) -> str:
+        """Create an MFA challenge for a user."""
+        # Generate a temporary token for this MFA challenge
+        mfa_token = secrets.token_urlsafe(32)
+
+        # Store the MFA challenge with a short expiry (5 minutes)
+        expiry = datetime.datetime.utcnow() + datetime.timedelta(minutes=5)
+        self._mfa_pending[mfa_token] = {
+            "user_id": user.id,
+            "expires_at": expiry
+        }
+
+        return mfa_token
+
+    def verify_mfa(self, mfa_token: str, mfa_code: str) -> Optional[Dict[str, str]]:
+        """Verify an MFA code and generate tokens if valid."""
+        # Check if the MFA challenge exists and is not expired
+        challenge = self._mfa_pending.get(mfa_token)
+        if not challenge:
+            return None
+
+        # Check if the challenge is expired
+        if datetime.datetime.utcnow() > challenge["expires_at"]:
+            # Remove expired challenge
+            self._mfa_pending.pop(mfa_token, None)
+            return None
+
+        # Get the user
+        user = self._users.get(challenge["user_id"])
+        if not user or not user.active:
+            return None
+
+        # Verify the MFA code
+        totp = pyotp.TOTP(user.mfa_secret)
+        if not totp.verify(mfa_code):
+            return None
+
+        # Remove the challenge once used
+        self._mfa_pending.pop(mfa_token, None)
+
+        # Generate tokens
+        return self.generate_token_pair(user)
+
+    def enable_mfa(self, user_id: str) -> Optional[str]:
+        """Enable MFA for a user and return the secret key."""
+        user = self._users.get(user_id)
+        if not user:
+            return None
+
+        # Generate a new secret key for TOTP
+        secret = pyotp.random_base32()
+        user.mfa_secret = secret
+        user.mfa_enabled = True
+
+        return secret
 
     def generate_token_pair(self, user: User) -> Dict[str, str]:
         """Generate a new access and refresh token pair for the user."""

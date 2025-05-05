@@ -6,7 +6,7 @@ const Signup = () => {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    email: "",
+    username: "",
     password: "",
     confirmPassword: "",
   });
@@ -25,10 +25,10 @@ const Signup = () => {
       newErrors.firstName = "First name is required";
     if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
 
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
+    if (!formData.username.trim()) {
+      newErrors.username = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(formData.username)) {
+      newErrors.username = "Email is invalid";
     }
 
     if (!formData.password) {
@@ -67,7 +67,7 @@ const Signup = () => {
       const userData = {
         first_name: formData.firstName,
         last_name: formData.lastName,
-        email: formData.email,
+        username: formData.username,
         password: formData.password,
       };
 
@@ -212,7 +212,7 @@ const Signup = () => {
 
           <div>
             <label
-              htmlFor="email"
+              htmlFor="username"
               className="block text-sm font-medium text-gray-700"
             >
               Email address
@@ -220,17 +220,17 @@ const Signup = () => {
             <div className="mt-1">
               <input
                 type="email"
-                name="email"
-                id="email"
+                name="username"
+                id="username"
                 autoComplete="email"
-                value={formData.email}
+                value={formData.username}
                 onChange={handleChange}
                 className={`appearance-none block w-full px-3 py-2 border ${
-                  errors.email ? "border-red-300" : "border-gray-300"
+                  errors.username ? "border-red-300" : "border-gray-300"
                 } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
               />
-              {errors.email && (
-                <p className="mt-2 text-sm text-red-600">{errors.email}</p>
+              {errors.username && (
+                <p className="mt-2 text-sm text-red-600">{errors.username}</p>
               )}
             </div>
           </div>
