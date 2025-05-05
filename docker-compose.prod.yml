@@ -8,6 +8,7 @@ services:
     networks:
       - analysis-net
     restart: unless-stopped
+
   rabbitmq:
     image: rabbitmq:3-management
     environment:
@@ -20,6 +21,7 @@ services:
     container_name: rabbitmq
     hostname: rabbitmq
     restart: unless-stopped
+
   dask-scheduler:
     image: ghcr.io/dask/dask:latest
     command: ["dask", "scheduler"]
@@ -28,6 +30,7 @@ services:
     container_name: scheduler
     hostname: scheduler
     restart: unless-stopped
+
   dask-worker:
     image: ghcr.io/dask/dask:latest
     command: ["dask", "worker", "tcp://scheduler:8786"]
@@ -40,6 +43,7 @@ services:
     restart: unless-stopped
     deploy:
       replicas: 2
+
   backend:
     image: ${BACKEND_IMAGE}
     environment:
@@ -62,24 +66,29 @@ services:
       - faiss_data:/app/faiss
       - uploads_data:/app/uploads
       - models_data:/app/models
+
   nginx:
-    image: nginx:latest
-    volumes:
-      - ./nginx:/etc/nginx/conf.d
+    image: ${NGINX_IMAGE}
+    # Removed volume mounting as configuration is now baked into the image
+    networks:
+      - analysis-net
+      - nginx_proxy # Connect to external nginx_proxy network
+    container_name: chat-analysis # Match this to what's expected by Nginx Proxy Manager
+    hostname: chat-analysis
+    environment:
+      - VIRTUAL_HOST=ai.pashkovsky.me # Add this for nginx-proxy to recognize
+      - VIRTUAL_PORT=80 # The port nginx listens on inside the container
+    restart: unless-stopped
     depends_on:
       - frontend
       - backend
-    networks:
-      - analysis-net
-      - nginx_proxy
-    container_name: nginx
-    hostname: chat-analysis
-    restart: unless-stopped
+
 networks:
   analysis-net:
     driver: bridge
   nginx_proxy:
-    external: true
+    external: true # Use existing external network
+
 volumes:
   rabbitmq_data:
     driver: local

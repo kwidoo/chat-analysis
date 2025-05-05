@@ -21,17 +21,13 @@ steps:
       - name: docker_sock
         path: /var/run/docker.sock
     settings:
-      repo: ${DRONE_REPO_OWNER}/chat-analysis-backend
+      repo: chat-analysis-backend
       tags:
         - ${DRONE_COMMIT_SHA:0:8}
         - latest
       dockerfile: backend/Dockerfile
       context: backend/
-      registry: ${DOCKER_REGISTRY}
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
+      # Local builds - no registry needed
     when:
       branch:
         - main
@@ -41,26 +37,38 @@ steps:
       - name: docker_sock
         path: /var/run/docker.sock
     settings:
-      repo: ${DRONE_REPO_OWNER}/chat-analysis-frontend
+      repo: chat-analysis-frontend
       tags:
         - ${DRONE_COMMIT_SHA:0:8}
         - latest
       dockerfile: frontend/Dockerfile
       context: frontend/
-      registry: ${DOCKER_REGISTRY}
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
+      # Local builds - no registry needed
+    when:
+      branch:
+        - main
+  - name: build-nginx
+    image: plugins/docker
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+    settings:
+      repo: chat-analysis-nginx
+      tags:
+        - ${DRONE_COMMIT_SHA:0:8}
+        - latest
+      dockerfile: nginx/Dockerfile
+      context: nginx/
+      # Local builds - no registry needed
     when:
       branch:
         - main
   - name: deploy
-    image: docker/compose:latest 
+    image: docker/compose:latest
     environment:
-      DOCKER_REGISTRY: docker.io
-      BACKEND_IMAGE: docker.io/${DRONE_REPO_OWNER}/chat-analysis-backend:${DRONE_COMMIT_SHA:0:8}
-      FRONTEND_IMAGE: docker.io/${DRONE_REPO_OWNER}/chat-analysis-frontend:${DRONE_COMMIT_SHA:0:8}
+      BACKEND_IMAGE: chat-analysis-backend:${DRONE_COMMIT_SHA:0:8}
+      FRONTEND_IMAGE: chat-analysis-frontend:${DRONE_COMMIT_SHA:0:8}
+      NGINX_IMAGE: chat-analysis-nginx:${DRONE_COMMIT_SHA:0:8}
       RABBITMQ_USER:
         from_secret: rabbitmq_user
       RABBITMQ_PASSWORD:
@@ -72,8 +80,6 @@ steps:
     volumes:
       - name: docker_sock
         path: /var/run/docker.sock
-      - name: docker-certs
-        path: /certs/client
     when:
       branch:
         - main
@@ -88,9 +94,6 @@ volumes:
   - name: docker_sock
     host:
       path: /var/run/docker.sock
-  - name: docker-certs
-    host:
-      path: /home/drone/certs
 trigger:
   branch:
     - main
