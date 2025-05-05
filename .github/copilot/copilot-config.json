@@ -1,0 +1,23 @@
+{
+    "enableCodeCompletions": true,
+    "enableChatCompletions": true,
+    "enableAutoCompletions": true,
+    "includePreviews": true,
+    "temperature": 0.6,
+    "topP": 0.95,
+    "indentationMode": "maintain",
+    "languagePreferences": {
+        "python": {
+            "templateSuggestions": true,
+            "includeDocs": true
+        },
+        "javascript": {
+            "templateSuggestions": true,
+            "includeDocs": true
+        },
+        "typescript": {
+            "templateSuggestions": true,
+            "includeDocs": true
+        }
+    }
+}
