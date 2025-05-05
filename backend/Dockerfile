@@ -12,10 +12,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first
-COPY requirements.txt .
+COPY install.sh .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN ./install.sh
 
 # Create necessary directories
 RUN mkdir -p /app/models/versions/v1 \
