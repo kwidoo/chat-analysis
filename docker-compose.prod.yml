@@ -1,3 +1,4 @@
+version: "3.8"
 services:
   frontend:
     image: ${FRONTEND_IMAGE}
@@ -36,9 +37,9 @@ services:
       - dask-scheduler
     networks:
       - analysis-net
+    restart: unless-stopped
     deploy:
       replicas: 2
-    restart: unless-stopped
   backend:
     image: ${BACKEND_IMAGE}
     runtime: nvidia
@@ -74,11 +75,11 @@ services:
     container_name: nginx
     hostname: chat-analysis
     restart: unless-stopped
-
+    ports:
+      - "80:80"
 networks:
   analysis-net:
     driver: bridge
-
 volumes:
   rabbitmq_data:
     driver: local
