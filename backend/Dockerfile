@@ -1,4 +1,4 @@
-FROM python:3.10.12-slim
+FROM nvidia/cuda:12.2.0-cudnn8-runtime-ubuntu22.04
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -7,10 +7,17 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
     libgomp1 \
     curl \
     git \
     && rm -rf /var/lib/apt/lists/*
+
+# Use python3 instead of python
+RUN ln -s /usr/bin/python3 /usr/bin/python && \
+    ln -s /usr/bin/pip3 /usr/bin/pip
 
 # Copy requirements first
 COPY install.sh .
@@ -32,6 +39,9 @@ COPY . .
 # Add database migration script
 COPY ./scripts/db_migrate.sh /app/scripts/
 RUN chmod +x /app/scripts/db_migrate.sh
+
+# Validate CUDA availability
+RUN python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count())"
 
 # Healthcheck
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \

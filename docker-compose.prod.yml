@@ -101,6 +101,7 @@ services:
     container_name: backend
     hostname: backend
     restart: unless-stopped
+    runtime: nvidia
     volumes:
       - faiss_data:/app/faiss
       - uploads_data:/app/uploads
@@ -109,6 +110,11 @@ services:
       resources:
         limits:
           memory: 4G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   nginx:
     image: ${NGINX_IMAGE}
