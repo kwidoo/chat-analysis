@@ -41,6 +41,7 @@ export default defineConfig({
     preview: {
         port: 3000,
         host: true,
-        historyApiFallback: true
+        historyApiFallback: true,
+        allowedHosts: ['ai.pashkovsky.me']
     },
 });
