@@ -21,6 +21,7 @@ steps:
       - name: docker_sock
         path: /var/run/docker.sock
     settings:
+      dry_run: true
       repo: chat-analysis-backend
       tags:
         - ${DRONE_COMMIT_SHA:0:8}
@@ -37,6 +38,7 @@ steps:
       - name: docker_sock
         path: /var/run/docker.sock
     settings:
+      dry_run: true
       repo: chat-analysis-frontend
       tags:
         - ${DRONE_COMMIT_SHA:0:8}
@@ -53,6 +55,7 @@ steps:
       - name: docker_sock
         path: /var/run/docker.sock
     settings:
+      dry_run: true
       repo: chat-analysis-nginx
       tags:
         - ${DRONE_COMMIT_SHA:0:8}
