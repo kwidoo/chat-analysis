@@ -30,6 +30,18 @@ class AppConfig(BaseModel):
     RABBITMQ_RETRY_DELAY: int
     RABBITMQ_MAX_CONNECTIONS: int
 
+    # Database Configuration
+    DB_TYPE: str = "sqlite"  # sqlite or mysql
+    DB_PATH: Optional[str] = None  # Path for SQLite database
+    DB_HOST: Optional[str] = None  # Host for MySQL
+    DB_PORT: Optional[int] = None  # Port for MySQL
+    DB_USERNAME: Optional[str] = None  # Username for MySQL
+    DB_PASSWORD: Optional[str] = None  # Password for MySQL
+    DB_DATABASE: Optional[str] = None  # Database name for MySQL
+    DB_POOL_SIZE: int = 10  # Connection pool size
+    DB_MAX_OVERFLOW: int = 20  # Max overflow connections
+    DB_POOL_RECYCLE: int = 3600  # Connection recycle time in seconds
+
     # Authentication System Configuration
     SECRET_KEY: Optional[str] = None
     JWT_ACCESS_TOKEN_EXPIRES: int = 3600  # 1 hour
@@ -48,6 +60,12 @@ class AppConfig(BaseModel):
     def validate_active_model(cls, v):
         if v not in ('v1', 'v2'):
             raise ValueError(f"Invalid model version: {v}")
+        return v
+
+    @validator('DB_TYPE')
+    def validate_db_type(cls, v):
+        if v not in ('sqlite', 'mysql'):
+            raise ValueError(f"Invalid database type: {v}")
         return v
 
 
@@ -79,6 +97,18 @@ class Config:
     RABBITMQ_CONNECTION_ATTEMPTS = 5
     RABBITMQ_RETRY_DELAY = 5
     RABBITMQ_MAX_CONNECTIONS = 10
+
+    # Database Configuration Defaults
+    DB_TYPE = "sqlite"
+    DB_PATH = os.path.join(APP_DIR, 'auth.db')
+    DB_HOST = "localhost"
+    DB_PORT = 3306
+    DB_USERNAME = "root"
+    DB_PASSWORD = ""
+    DB_DATABASE = "ai3_auth"
+    DB_POOL_SIZE = 10
+    DB_MAX_OVERFLOW = 20
+    DB_POOL_RECYCLE = 3600
 
     # Authentication System Configuration Defaults
     SECRET_KEY = None
@@ -124,6 +154,8 @@ class DevelopmentConfig(Config):
     MEMORY_LIMIT = "2GB"
     SECRET_KEY = "dev-secret-key" # Override default
     OAUTH_ENABLED = True # Override default
+    DB_TYPE = "sqlite"  # Use SQLite for development
+    DB_PATH = os.path.join(Config.APP_DIR, 'dev_auth.db')
 
 
 class TestingConfig(Config):
@@ -140,6 +172,8 @@ class TestingConfig(Config):
     SECRET_KEY = "test-secret-key" # Override default
     JWT_ACCESS_TOKEN_EXPIRES = 60
     JWT_REFRESH_TOKEN_EXPIRES = 300
+    DB_TYPE = "sqlite"  # Use SQLite for testing
+    DB_PATH = "/tmp/test_auth.db"  # Use temp path for testing
 
 
 class ProductionConfig(Config):
@@ -148,6 +182,8 @@ class ProductionConfig(Config):
     TESTING = False
     MEMORY_LIMIT = "8GB" # Override default
     SESSION_TYPE = "redis" # Override default
+    DB_TYPE = "mysql"  # Use MySQL for production
+    # DB credentials should be set via environment variables
 
 
 # Configuration mapping
@@ -179,6 +215,18 @@ def get_config_object(config_name: Optional[str] = None) -> Config:
     config_instance.ACTIVE_MODEL = os.environ.get('ACTIVE_MODEL', config_instance.ACTIVE_MODEL)
     config_instance.MEMORY_LIMIT = os.environ.get('MEMORY_LIMIT', config_instance.MEMORY_LIMIT)
     config_instance.DASK_SCHEDULER_ADDRESS = os.environ.get('DASK_SCHEDULER_ADDRESS', config_instance.DASK_SCHEDULER_ADDRESS)
+
+    # Database configuration
+    config_instance.DB_TYPE = os.environ.get("DB_TYPE", config_instance.DB_TYPE)
+    config_instance.DB_PATH = os.environ.get("DB_PATH", config_instance.DB_PATH)
+    config_instance.DB_HOST = os.environ.get("DB_HOST", config_instance.DB_HOST)
+    config_instance.DB_PORT = int(os.environ.get("DB_PORT", config_instance.DB_PORT))
+    config_instance.DB_USERNAME = os.environ.get("DB_USERNAME", config_instance.DB_USERNAME)
+    config_instance.DB_PASSWORD = os.environ.get("DB_PASSWORD", config_instance.DB_PASSWORD)
+    config_instance.DB_DATABASE = os.environ.get("DB_DATABASE", config_instance.DB_DATABASE)
+    config_instance.DB_POOL_SIZE = int(os.environ.get("DB_POOL_SIZE", config_instance.DB_POOL_SIZE))
+    config_instance.DB_MAX_OVERFLOW = int(os.environ.get("DB_MAX_OVERFLOW", config_instance.DB_MAX_OVERFLOW))
+    config_instance.DB_POOL_RECYCLE = int(os.environ.get("DB_POOL_RECYCLE", config_instance.DB_POOL_RECYCLE))
 
     # RabbitMQ - Prioritize URL, then individual vars, then class defaults
     rabbitmq_url = os.environ.get("RABBITMQ_URL")

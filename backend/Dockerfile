@@ -23,10 +23,15 @@ RUN mkdir -p /app/models/versions/v1 \
     /app/models/versions/v2 \
     /app/faiss/indexes/model_v1 \
     /app/faiss/indexes/model_v2 \
-    /app/queues
+    /app/queues \
+    /app/db
 
 # Copy application code
 COPY . .
+
+# Add database migration script
+COPY ./scripts/db_migrate.sh /app/scripts/
+RUN chmod +x /app/scripts/db_migrate.sh
 
 # Healthcheck
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
@@ -35,5 +40,6 @@ HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
 # Set active model
 ENV ACTIVE_MODEL=v1
 
-# Run the application with gunicorn
+# Run database migrations and the application with gunicorn
+ENTRYPOINT ["/app/scripts/db_migrate.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]

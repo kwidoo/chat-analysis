@@ -1,13 +1,13 @@
-task*.md
 .stignore
-completed-tasks.md
 concat.sh
-context.md
 deploy.sh
-deployment.md
 merged.py
-production-tasks.md
-refactoring-guidelines.md
 .venv
 __pycache__
 .env
+backend/flask_session
+backend/flask_sessions
+# Database files
+backend/auth.db
+backend/dev_auth.db
+backend/db/*.db

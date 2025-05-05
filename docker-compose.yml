@@ -56,6 +56,27 @@ services:
     deploy:
       replicas: ${DASK_WORKERS:-2}
 
+  db:
+    image: ${DB_IMAGE:-mysql:8.0}
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${DB_DATABASE:-ai3_auth}
+      - MYSQL_USER=${DB_USERNAME:-ai3user}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-ai3password}
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - ${DB_PORT:-3306}:3306
+    networks:
+      - analysis-net
+    container_name: db
+    hostname: db
+    # Only create this service in production or when explicitly requested
+    profiles:
+      - production
+      - mysql
+
   backend:
     build:
       context: ./backend
@@ -65,12 +86,25 @@ services:
       - faiss_data:/app/faiss
       - uploads_data:/app/uploads
       - models_data:/app/models
+      - db_data:/app/db # For SQLite persistence
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=${FLASK_ENV:-development}
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-development_secret_key}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       - DASK_SCHEDULER=tcp://scheduler:8786
+      # Database configuration
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - DB_PATH=/app/db/auth.db
+      # MySQL configuration (used when DB_TYPE=mysql)
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USERNAME=${DB_USERNAME:-ai3user}
+      - DB_PASSWORD=${DB_PASSWORD:-ai3password}
+      - DB_DATABASE=${DB_DATABASE:-ai3_auth}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-20}
+      - DB_POOL_RECYCLE=${DB_POOL_RECYCLE:-3600}
     ports:
       - "5000"
     depends_on:
@@ -116,4 +150,6 @@ volumes:
   uploads_data:
     driver: local
   models_data:
+    driver: local
+  db_data:
     driver: local

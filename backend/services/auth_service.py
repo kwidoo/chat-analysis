@@ -9,6 +9,10 @@ import jwt
 from flask import current_app, Request
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
+
+from models.user import User as DBUser, Role, RefreshToken
+from db.session import db
 
 
 class TokenPayload(BaseModel):
@@ -30,17 +34,6 @@ class MFAVerification(BaseModel):
     mfa_code: str
 
 
-class User(BaseModel):
-    id: str
-    username: str
-    password_hash: str
-    active: bool
-    roles: List[str] = []
-    refresh_tokens: Dict[str, Dict] = {}  # token_id -> {exp, revoked}
-    mfa_secret: Optional[str] = None
-    mfa_enabled: bool = False
-
-
 class AuthService:
     """Service for handling authentication and authorization using JWT tokens."""
 
@@ -56,35 +49,59 @@ class AuthService:
         self.secret_key = secret_key
         self.token_expiry = token_expiry
         self.refresh_expiry = refresh_expiry
-        self._users = {}  # In-memory user store (replace with DB in production)
         self._mfa_pending = {}  # Store MFA challenges temporarily
 
-    def create_user(self, username: str, password: str, roles: List[str] = ["user"]) -> User:
+    def create_user(self, username: str, password: str, roles: List[str] = ["user"]) -> DBUser:
         """Create a new user with the given credentials and roles."""
-        if username in [user.username for user in self._users.values()]:
+        # Check if user already exists
+        existing_user = db.session.query(DBUser).filter(DBUser.email == username).first()
+        if existing_user:
             raise ValueError(f"Username '{username}' already exists")
 
-        user_id = str(uuid.uuid4())
+        # Hash password
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-        user = User(
-            id=user_id,
-            username=username,
-            password_hash=password_hash,
-            active=True,
-            roles=roles,
-            refresh_tokens={}
+        # Create new user
+        new_user = DBUser(
+            id=str(uuid.uuid4()),
+            email=username,
+            hashed_password=password_hash,
+            active=True
         )
 
-        self._users[user_id] = user
-        return user
+        # Find or create role objects
+        for role_name in roles:
+            role = db.session.query(Role).filter(Role.name == role_name).first()
+            if not role:
+                # Create the role if it doesn't exist
+                role = Role(id=str(uuid.uuid4()), name=role_name)
+                db.session.add(role)
+
+            # Assign role to user
+            new_user.roles.append(role)
+
+        try:
+            # Save to database
+            db.session.add(new_user)
+            db.session.commit()
+            return new_user
+        except IntegrityError:
+            db.session.rollback()
+            raise ValueError(f"Error creating user '{username}'")
 
     def authenticate(self, username: str, password: str) -> Optional[Dict]:
         """Authenticate a user with the given credentials."""
-        user = next((u for u in self._users.values() if u.username == username and u.active), None)
+        user = db.session.query(DBUser).filter(
+            DBUser.email == username,
+            DBUser.active == True
+        ).first()
 
-        if not user or not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+        if not user or not bcrypt.checkpw(password.encode('utf-8'), user.hashed_password.encode('utf-8')):
             return None
+
+        # Update last login time
+        user.last_login = datetime.datetime.utcnow()
+        db.session.commit()
 
         # If MFA is enabled, return MFA challenge instead of tokens
         if user.mfa_enabled:
@@ -100,7 +117,7 @@ class AuthService:
             **self.generate_token_pair(user)
         }
 
-    def _create_mfa_challenge(self, user: User) -> str:
+    def _create_mfa_challenge(self, user: DBUser) -> str:
         """Create an MFA challenge for a user."""
         # Generate a temporary token for this MFA challenge
         mfa_token = secrets.token_urlsafe(32)
@@ -128,7 +145,7 @@ class AuthService:
             return None
 
         # Get the user
-        user = self._users.get(challenge["user_id"])
+        user = db.session.query(DBUser).get(challenge["user_id"])
         if not user or not user.active:
             return None
 
@@ -145,7 +162,7 @@ class AuthService:
 
     def enable_mfa(self, user_id: str) -> Optional[str]:
         """Enable MFA for a user and return the secret key."""
-        user = self._users.get(user_id)
+        user = db.session.query(DBUser).get(user_id)
         if not user:
             return None
 
@@ -154,9 +171,10 @@ class AuthService:
         user.mfa_secret = secret
         user.mfa_enabled = True
 
+        db.session.commit()
         return secret
 
-    def generate_token_pair(self, user: User) -> Dict[str, str]:
+    def generate_token_pair(self, user: DBUser) -> Dict[str, str]:
         """Generate a new access and refresh token pair for the user."""
         now = datetime.datetime.utcnow()
 
@@ -169,7 +187,7 @@ class AuthService:
             'iat': int(now.timestamp()),
             'jti': access_jti,
             'type': 'access',
-            'roles': user.roles
+            'roles': user.role_names
         }
         access_token = jwt.encode(access_payload, self.secret_key, algorithm='HS256')
 
@@ -185,11 +203,16 @@ class AuthService:
         }
         refresh_token = jwt.encode(refresh_payload, self.secret_key, algorithm='HS256')
 
-        # Store refresh token reference
-        user.refresh_tokens[refresh_jti] = {
-            'exp': int(refresh_exp.timestamp()),
-            'revoked': False
-        }
+        # Store refresh token in database
+        new_refresh_token = RefreshToken(
+            id=refresh_jti,
+            user_id=user.id,
+            expires_at=refresh_exp,
+            revoked=False
+        )
+
+        db.session.add(new_refresh_token)
+        db.session.commit()
 
         return {
             'access_token': access_token,
@@ -209,17 +232,18 @@ class AuthService:
                 return None
 
             # Get user
-            user = self._users.get(token_data.sub)
+            user = db.session.query(DBUser).get(token_data.sub)
             if not user or not user.active:
                 return None
 
             # Check if refresh token exists and is not revoked
-            token_info = user.refresh_tokens.get(token_data.jti)
-            if not token_info or token_info.get('revoked', False):
+            token = db.session.query(RefreshToken).get(token_data.jti)
+            if not token or token.revoked:
                 return None
 
             # Revoke the used refresh token (rotation)
-            user.refresh_tokens[token_data.jti]['revoked'] = True
+            token.revoked = True
+            db.session.commit()
 
             # Generate new token pair
             return self.generate_token_pair(user)
@@ -234,14 +258,14 @@ class AuthService:
             token_data = TokenPayload(**payload)
 
             # Verify user exists and is active
-            user = self._users.get(token_data.sub)
+            user = db.session.query(DBUser).get(token_data.sub)
             if not user or not user.active:
                 return None
 
             # If it's a refresh token, verify it's not revoked
             if token_data.type == 'refresh':
-                token_info = user.refresh_tokens.get(token_data.jti)
-                if not token_info or token_info.get('revoked', False):
+                token = db.session.query(RefreshToken).get(token_data.jti)
+                if not token or token.revoked:
                     return None
 
             return token_data
@@ -258,33 +282,30 @@ class AuthService:
             if token_data.type != 'refresh':
                 return False
 
-            user = self._users.get(token_data.sub)
-            if not user:
+            db_token = db.session.query(RefreshToken).get(token_data.jti)
+            if not db_token:
                 return False
 
-            if token_data.jti in user.refresh_tokens:
-                user.refresh_tokens[token_data.jti]['revoked'] = True
-                return True
-
-            return False
+            db_token.revoked = True
+            db.session.commit()
+            return True
 
         except (ExpiredSignatureError, InvalidTokenError):
             return False
 
     def clean_expired_tokens(self):
         """Clean up expired refresh tokens from user records."""
-        now = int(datetime.datetime.utcnow().timestamp())
+        now = datetime.datetime.utcnow()
 
-        for user in self._users.values():
-            # Create a list of expired token IDs
-            expired_tokens = [
-                token_id for token_id, token_data in user.refresh_tokens.items()
-                if token_data['exp'] < now
-            ]
+        # Find and delete expired tokens
+        expired_tokens = db.session.query(RefreshToken).filter(
+            RefreshToken.expires_at < now
+        ).all()
 
-            # Remove expired tokens
-            for token_id in expired_tokens:
-                del user.refresh_tokens[token_id]
+        for token in expired_tokens:
+            db.session.delete(token)
+
+        db.session.commit()
 
     def get_token_from_header(self, request: Request) -> Optional[str]:
         """Extract JWT token from Authorization header."""
@@ -298,6 +319,30 @@ class AuthService:
 
         return parts[1]
 
-    def get_user_by_id(self, user_id: str) -> Optional[User]:
+    def get_user_by_id(self, user_id: str) -> Optional[DBUser]:
         """Retrieve a user by their ID."""
-        return self._users.get(user_id)
+        return db.session.query(DBUser).get(user_id)
+
+    def get_user_by_email(self, email: str) -> Optional[DBUser]:
+        """Retrieve a user by their email."""
+        return db.session.query(DBUser).filter(DBUser.email == email).first()
+
+    def create_default_roles(self):
+        """Create default roles if they don't exist."""
+        default_roles = [
+            {"name": "user", "description": "Regular user with basic privileges"},
+            {"name": "admin", "description": "Administrator with full privileges"},
+            {"name": "editor", "description": "User with content editing privileges"}
+        ]
+
+        for role_data in default_roles:
+            role = db.session.query(Role).filter(Role.name == role_data["name"]).first()
+            if not role:
+                role = Role(
+                    id=str(uuid.uuid4()),
+                    name=role_data["name"],
+                    description=role_data["description"]
+                )
+                db.session.add(role)
+
+        db.session.commit()

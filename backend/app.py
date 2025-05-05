@@ -23,6 +23,9 @@ from services.auth_service import AuthService
 from services.permission_middleware import PermissionMiddleware
 from services.oauth_integration import OAuthIntegration, create_google_provider
 from dask.distributed import Client
+from db.session import DatabaseSessionManager, db
+from db.session import Base
+from cli import register_cli_commands
 
 
 def setup_dask_client(app):
@@ -81,6 +84,29 @@ def setup_rabbitmq_pool(app):
         app.rabbitmq_pool = None
 
 
+def setup_database(app):
+    """Initialize database connection and setup ORM
+
+    Args:
+        app: Flask application instance
+    """
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Initialize database session manager
+        db_manager = DatabaseSessionManager()
+        db_manager.init_app(app)
+
+        logger.info(f"Database initialized with {app.config.get('DB_TYPE', 'sqlite')}")
+
+        # Store db_manager on app for potential access
+        app.db_manager = db_manager
+
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
+
+
 def setup_auth_system(app):
     """Initialize Authentication System
 
@@ -103,6 +129,9 @@ def setup_auth_system(app):
             token_expiry=token_expiry,
             refresh_expiry=refresh_expiry
         )
+
+        # Create default roles
+        app.auth_service.create_default_roles()
 
         # Setup permission middleware
         app.permission_middleware = PermissionMiddleware(app.auth_service)
@@ -233,8 +262,14 @@ def create_app(config_name=None):
     # Note: init_app uses app.config which is now correctly populated
     Config.init_app(app)
 
+    # Set up database connection
+    setup_database(app)
+
     # Set up Authentication System
     setup_auth_system(app)
+
+    # Register CLI commands
+    register_cli_commands(app)
 
     # Set up Dask client for distributed processing
     setup_dask_client(app)

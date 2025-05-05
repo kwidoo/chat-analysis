@@ -211,7 +211,17 @@ export const AuthProvider = ({ children }) => {
         throw new Error(errData.message || "Registration failed");
       }
 
-      return { success: true };
+      const data = await response.json();
+
+      // Store tokens
+      localStorage.setItem("accessToken", data.access_token);
+      localStorage.setItem("refreshToken", data.refresh_token);
+
+      // Fetch user data
+      const userInfo = await fetchUserInfo(data.access_token);
+      setUser(userInfo);
+
+      return { success: true, user: userInfo };
     } catch (err) {
       console.error("Registration error:", err);
       setError(err.message || "Registration failed. Please try again.");
