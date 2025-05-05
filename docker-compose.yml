@@ -82,12 +82,15 @@ services:
       - dask-scheduler
     networks:
       - analysis-net
+      - nginx_proxy # Add the external nginx_proxy network
     container_name: nginx
-    hostname: nginx
+    hostname: chat-analysis # Match the hostname to what you set in nginx proxy manager
 
 networks:
   analysis-net:
     driver: bridge
+  nginx_proxy:
+    external: true # Reference the external network
 
 volumes:
   rabbitmq_data:

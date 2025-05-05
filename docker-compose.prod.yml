@@ -71,12 +71,15 @@ services:
       - backend
     networks:
       - analysis-net
+      - nginx_proxy
     container_name: nginx
     hostname: chat-analysis
     restart: unless-stopped
 networks:
   analysis-net:
     driver: bridge
+  nginx_proxy:
+    external: true
 volumes:
   rabbitmq_data:
     driver: local
