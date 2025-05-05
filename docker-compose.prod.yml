@@ -39,10 +39,15 @@ services:
       - analysis-net
     restart: unless-stopped
     deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
       replicas: 2
   backend:
     image: ${BACKEND_IMAGE}
-    runtime: nvidia
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=production
