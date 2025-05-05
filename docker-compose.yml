@@ -26,8 +26,6 @@ services:
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-    ports:
-      - "15672"
     networks:
       - analysis-net
     container_name: rabbitmq
@@ -57,7 +55,7 @@ services:
       replicas: ${DASK_WORKERS:-2}
 
   db:
-    image: ${DB_IMAGE:-mysql:8.0}
+    image: ${DB_IMAGE:-mariadb:10.6}
     restart: always
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootpassword}
@@ -66,8 +64,6 @@ services:
       - MYSQL_PASSWORD=${DB_PASSWORD:-ai3password}
     volumes:
       - db_data:/var/lib/mysql
-    ports:
-      - ${DB_PORT:-3306}:3306
     networks:
       - analysis-net
     container_name: db
@@ -105,8 +101,6 @@ services:
       - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-20}
       - DB_POOL_RECYCLE=${DB_POOL_RECYCLE:-3600}
-    ports:
-      - "5000"
     depends_on:
       - rabbitmq
       - dask-scheduler

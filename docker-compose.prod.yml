@@ -23,8 +23,6 @@ services:
     container_name: rabbitmq
     hostname: rabbitmq
     restart: unless-stopped
-    ports:
-      - "15672:15672"
 
   dask-scheduler:
     image: ghcr.io/dask/dask:latest
@@ -58,7 +56,7 @@ services:
           memory: 8G  # More memory per worker
 
   db:
-    image: mysql:8.0
+    image: mariadb:10.6
     restart: always
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-strongrootpassword}
@@ -67,8 +65,6 @@ services:
       - MYSQL_PASSWORD=${DB_PASSWORD:-ai3password}
     volumes:
       - db_data:/var/lib/mysql
-    ports:
-      - "3306:3306"  # Expose port for external connections
     networks:
       - analysis-net
     profiles: []  # Empty profiles means always included
