@@ -5,24 +5,60 @@ node:
   machine: drone-ai
 
 steps:
-  # - name: test-backend
-  #   image: nvidia/cuda:12.2.0-cudnn8-runtime-ubuntu22.04
-  #   volumes:
-  #     - name: docker_sock
-  #       path: /var/run/docker.sock
-  #     - name: nvidia_gpu
-  #       path: /usr/local/nvidia
-  #   environment:
-  #     NVIDIA_VISIBLE_DEVICES: all
-  #     NVIDIA_DRIVER_CAPABILITIES: compute,utility
-  #   commands:
-  #     - apt-get update && apt-get install -y python3 python3-pip
-  #     - cd backend
-  #     - pip3 install -r requirements.txt
-  #     - pip3 install pytest
-  #     - python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count())"
-  #     - nvidia-smi
-  #     - pytest tests/
+  - name: lint-backend
+    image: python:3.10
+    commands:
+      - cd backend
+      - pip install flake8 mypy bandit
+      - flake8 --max-line-length=100 --exclude=__pycache__,migrations,venv .
+      - mypy --ignore-missing-imports .
+      - bandit -r . -x tests/,venv/
+
+  - name: test-backend
+    image: rapidsai/base:24.10-cuda12.5-py3.11
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+      - name: nvidia_gpu
+        path: /usr/local/nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      PYTHONPATH: /drone/src/backend
+    commands:
+      - apt-get update && apt-get install -y python3 python3-pip
+      - cd backend
+      - pip3 install -r requirements.txt
+      - pip3 install pytest pytest-cov
+      - python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count())"
+      - nvidia-smi
+      - pytest tests/ --cov=. --cov-report=xml
+
+  - name: test-frontend
+    image: node:16
+    commands:
+      - cd frontend
+      - npm install
+      - npm test -- --coverage
+
+  - name: performance-tests
+    image: python:3.10
+    commands:
+      - cd backend
+      - pip install -r requirements.txt
+      - pip install pytest
+      - pytest tests/load/test_faiss.py -v
+      - pytest tests/ci/test_rabbitmq.py -v
+
+  - name: security-scan
+    image: owasp/zap2docker-stable
+    commands:
+      - mkdir -p /zap/wrk/
+      - cd /zap/wrk/
+      - echo "Starting ZAP security scan..."
+      - zap-baseline.py -t http://backend:5000/api/auth/ -g gen.conf -r zap-report.html || true
+      - echo "ZAP scan completed"
+
   - name: build-backend
     image: plugins/docker
     volumes:
@@ -40,6 +76,7 @@ steps:
     when:
       branch:
         - main
+
   - name: build-frontend
     image: plugins/docker
     volumes:
@@ -57,6 +94,7 @@ steps:
     when:
       branch:
         - main
+
   - name: build-nginx
     image: plugins/docker
     volumes:
@@ -74,6 +112,7 @@ steps:
     when:
       branch:
         - main
+
   - name: deploy
     image: docker/compose:latest
     environment:
@@ -94,6 +133,7 @@ steps:
     when:
       branch:
         - main
+
 services:
   - name: docker
     image: docker:dind
@@ -101,6 +141,23 @@ services:
     volumes:
       - name: docker-socket
         path: /var/run/docker.sock
+
+  - name: backend
+    image: chat-analysis-backend:latest
+    environment:
+      FLASK_APP: app.py
+      FLASK_ENV: development
+      FLASK_SECRET_KEY: test-key
+      DB_TYPE: sqlite
+      DB_DATABASE: ":memory:"
+    commands:
+      - cd /app
+      - python app.py
+    when:
+      event:
+        - push
+        - pull_request
+
 volumes:
   - name: docker_sock
     host:
@@ -108,6 +165,7 @@ volumes:
   - name: nvidia_gpu
     host:
       path: /usr/local/nvidia
+
 trigger:
   branch:
     - main

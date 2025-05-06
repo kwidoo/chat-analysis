@@ -3,8 +3,6 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE}
     environment:
-      NODE_ENV: production
-      REACT_APP_API_URL: /api
       - NODE_ENV=production
       - VITE_API_URL=/api
     networks:
@@ -25,7 +23,7 @@ services:
     restart: unless-stopped
 
   dask-scheduler:
-    image: ghcr.io/dask/dask:latest
+    image: rapidsai/base:24.10-cuda12.5-py3.11
     command: ["dask", "scheduler"]
     networks:
       - analysis-net
@@ -33,15 +31,15 @@ services:
     hostname: scheduler
     restart: unless-stopped
     ports:
-      - "8787:8787"  # Dashboard access
+      - "8787:8787"
     deploy:
       resources:
         limits:
           memory: 4G
 
   dask-worker:
-    image: ghcr.io/dask/dask:latest
-    command: ["dask", "worker", "tcp://scheduler:8786"]
+    image: rapidsai/base:24.10-cuda12.5-py3.11
+    command: ["dask", "worker", "tcp://scheduler:8786", "--nthreads", "1", "--memory-limit", "8GB"]
     environment:
       - DASK_SCHEDULER=tcp://scheduler:8786
     depends_on:
@@ -49,11 +47,17 @@ services:
     networks:
       - analysis-net
     restart: unless-stopped
+    runtime: nvidia
     deploy:
-      replicas: 4  # More workers in production
+      replicas: 4
       resources:
         limits:
-          memory: 8G  # More memory per worker
+          memory: 8G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   db:
     image: mariadb:10.6
@@ -67,7 +71,6 @@ services:
       - db_data:/var/lib/mysql
     networks:
       - analysis-net
-    profiles: []  # Empty profiles means always included
     deploy:
       resources:
         limits:
@@ -81,8 +84,6 @@ services:
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
       - DASK_SCHEDULER=tcp://scheduler:8786
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - DB_TYPE=mysql
       - DB_HOST=db
       - DB_PORT=3306
@@ -118,11 +119,10 @@ services:
 
   nginx:
     image: ${NGINX_IMAGE}
-    # Removed volume mounting as configuration is now baked into the image
     networks:
       - analysis-net
-      - nginx_proxy # Connect to external nginx_proxy network
-    container_name: chat-analysis # Match this to what's expected by Nginx Proxy Manager
+      - nginx_proxy
+    container_name: chat-analysis
     hostname: chat-analysis
     environment:
       - VIRTUAL_HOST=${VIRTUAL_HOST:-chat-analysis.example.com}
@@ -137,7 +137,7 @@ networks:
   analysis-net:
     driver: bridge
   nginx_proxy:
-    external: true # Use existing external network
+    external: true
 
 volumes:
   rabbitmq_data:
