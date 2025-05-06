@@ -126,7 +126,7 @@ steps:
       FLASK_SECRET_KEY:
         from_secret: flask_secret_key
     commands:
-      - docker-compose -f docker-compose.prod.yml up -d
+      - docker compose -f docker-compose.prod.yml up -d
     volumes:
       - name: docker_sock
         path: /var/run/docker.sock
