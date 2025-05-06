@@ -114,7 +114,7 @@ steps:
         - main
 
   - name: deploy
-    image: docker/compose:latest
+    image: docker:latest
     environment:
       BACKEND_IMAGE: chat-analysis-backend:${DRONE_COMMIT_SHA:0:8}
       FRONTEND_IMAGE: chat-analysis-frontend:${DRONE_COMMIT_SHA:0:8}
