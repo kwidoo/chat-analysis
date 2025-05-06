@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Use python3 instead of python
-RUN ln -s /usr/bin/python3 /usr/bin/python && \
-    ln -s /usr/bin/pip3 /usr/bin/pip
+# RUN ln -s /usr/bin/python3 /usr/bin/python && \
+#     ln -s /usr/bin/pip3 /usr/bin/pip
 
 # Copy requirements first
 COPY install.sh .
