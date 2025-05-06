@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure Python can find our modules
+export PYTHONPATH=/app:$PYTHONPATH
+
 # Wait for potential database to be ready (especially important if using MySQL)
 if [ "$DB_TYPE" = "mysql" ]; then
     echo "Waiting for database to be ready..."
@@ -27,7 +30,7 @@ fi
 # Run database migrations
 echo "Running database migrations..."
 cd /app
-flask db upgrade || (echo "Migration command failed. Will try to create tables directly."; FLASK_APP=app.py python -c "from app import app; app.app_context().push(); from db.session import db; db.create_all()")
+flask db upgrade || (echo "Migration command failed. Will try to create tables directly."; FLASK_APP=app.py python -c "import sys; sys.path.insert(0, '/app'); from app import app; app.app_context().push(); from db.session import db; db.create_all()")
 
 echo "Migrations completed successfully"
 

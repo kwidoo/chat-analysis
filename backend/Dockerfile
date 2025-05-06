@@ -2,6 +2,8 @@ FROM rapidsai/base:24.10-cuda12.5-py3.11
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+# Add PYTHONPATH environment variable to include the app directory
+ENV PYTHONPATH=/app:$PYTHONPATH
 
 WORKDIR /app
 USER root
