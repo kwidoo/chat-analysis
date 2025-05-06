@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     curl \
     git \
+    netcat \
+    nano \
     && rm -rf /var/lib/apt/lists/*
 
 # Use python3 instead of python
