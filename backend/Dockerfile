@@ -54,6 +54,4 @@ ENV ACTIVE_MODEL=v1
 # Run database migrations and the application with gunicorn
 ENTRYPOINT ["/app/scripts/db_migrate.sh"]
 
-USER appuser
-
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]
