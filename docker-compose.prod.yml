@@ -117,7 +117,7 @@ services:
     volumes:
       - faiss_data:/app/faiss
       - uploads_data:/app/uploads
-      - models_data:/app/models
+      - models_data:/app/ai_models
     deploy:
       resources:
         reservations:
