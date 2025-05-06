@@ -7,7 +7,7 @@ from flask import Flask
 from flask.cli import with_appcontext
 
 
-def register_cli_commands(app: Flask):
+def register_commands(app: Flask):
     """Register CLI commands with Flask application."""
 
     @app.cli.group(help="Database operations")
@@ -76,7 +76,6 @@ def register_cli_commands(app: Flask):
     @with_appcontext
     def create_roles():
         """Create default roles in the database."""
-        from app import app
         from models.user import Role
 
         try:
@@ -99,8 +98,6 @@ def register_cli_commands(app: Flask):
     @with_appcontext
     def create_admin(username, password):
         """Create admin user in the database."""
-        from app import app
-
         try:
             with app.app_context():
                 # Use provided credentials or default from config

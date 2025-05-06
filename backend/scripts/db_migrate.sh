@@ -27,10 +27,10 @@ if [ "$DB_TYPE" = "mysql" ]; then
     fi
 fi
 
-# Run database migrations
+# Run database migrations using the custom CLI commands
 echo "Running database migrations..."
 cd /app
-flask db upgrade || (echo "Migration command failed. Will try to create tables directly."; FLASK_APP=app.py python -c "import sys; sys.path.insert(0, '/app'); from app import app; app.app_context().push(); from db.session import db; db.create_all()")
+flask db_commands upgrade || (echo "Migration command failed. Will try to create tables directly."; FLASK_APP=app.py python -c "import sys; sys.path.insert(0, '/app'); from app import app; app.app_context().push(); from db.session import db; db.create_all()")
 
 echo "Migrations completed successfully"
 

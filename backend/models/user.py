@@ -72,7 +72,8 @@ class User(db.Model):
 
     # JSON field for storing additional user metadata
     # Using SQLAlchemy-JSON for cross-database compatibility
-    meta_data = Column(MutableDict.as_mutable(JSON), default=dict)
+    # Renamed from meta_data to avoid conflict with SQLAlchemy's metadata
+    metadata_json = Column(MutableDict.as_mutable(JSON), default=dict)
 
     def __repr__(self):
         return f"<User {self.email}>"

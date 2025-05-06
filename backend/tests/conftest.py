@@ -3,10 +3,10 @@ import sys
 import tempfile
 
 import pytest
-from app import create_app
-from db.session import get_db_session
+from core.app_factory import create_app
+from db.session import Base, db
 from flask import Flask
-from models.user import User
+from models.user import Role, User
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -91,8 +91,6 @@ def db_session(app):
     session = scoped_session(session_factory)
 
     # Create tables
-    from models.user import Base
-
     Base.metadata.create_all(engine)
 
     yield session
@@ -129,8 +127,7 @@ def mock_dask():
 def auth_headers(app, db_session):
     """Create a test user and return authentication headers"""
     # Create a test user
-    test_user = User(username="testuser", email="test@example.com")
-    test_user.set_password("password123")
+    test_user = User(email="test@example.com", hashed_password="password123")
     db_session.add(test_user)
     db_session.commit()
 
@@ -144,8 +141,7 @@ def auth_headers(app, db_session):
 @pytest.fixture
 def test_user(db_session):
     """Create and return a test user"""
-    user = User(username="testuser", email="test@example.com")
-    user.set_password("password123")
+    user = User(email="test@example.com", hashed_password="password123")
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
