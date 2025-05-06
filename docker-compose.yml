@@ -81,7 +81,7 @@ services:
       - ./backend:/app
       - faiss_data:/app/faiss
       - uploads_data:/app/uploads
-      - models_data:/app/models
+      # - models_data:/app/models
       - db_data:/app/db # For SQLite persistence
     environment:
       - FLASK_APP=app.py
@@ -101,6 +101,7 @@ services:
       - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-20}
       - DB_POOL_RECYCLE=${DB_POOL_RECYCLE:-3600}
+      - PYTHONPATH=/app
     depends_on:
       - rabbitmq
       - dask-scheduler
