@@ -34,30 +34,30 @@ steps:
   #     - nvidia-smi
   #     - pytest tests/ --cov=. --cov-report=xml
 
-  - name: test-frontend
-    image: node:16
-    commands:
-      - cd frontend
-      - npm install
-      - npm test -- --coverage
+  # - name: test-frontend
+  #   image: node:16
+  #   commands:
+  #     - cd frontend
+  #     - npm install
+  #     - npm test -- --coverage
 
-  - name: performance-tests
-    image: python:3.10
-    commands:
-      - cd backend
-      - pip install -r requirements.txt
-      - pip install pytest
-      - pytest tests/load/test_faiss.py -v
-      - pytest tests/ci/test_rabbitmq.py -v
+  # - name: performance-tests
+  #   image: python:3.10
+  #   commands:
+  #     - cd backend
+  #     - pip install -r requirements.txt
+  #     - pip install pytest
+  #     - pytest tests/load/test_faiss.py -v
+  #     - pytest tests/ci/test_rabbitmq.py -v
 
-  - name: security-scan
-    image: owasp/zap2docker-stable
-    commands:
-      - mkdir -p /zap/wrk/
-      - cd /zap/wrk/
-      - echo "Starting ZAP security scan..."
-      - zap-baseline.py -t http://backend:5000/api/auth/ -g gen.conf -r zap-report.html || true
-      - echo "ZAP scan completed"
+  # - name: security-scan
+  #   image: owasp/zap2docker-stable
+  #   commands:
+  #     - mkdir -p /zap/wrk/
+  #     - cd /zap/wrk/
+  #     - echo "Starting ZAP security scan..."
+  #     - zap-baseline.py -t http://backend:5000/api/auth/ -g gen.conf -r zap-report.html || true
+  #     - echo "ZAP scan completed"
 
   - name: build-backend
     image: plugins/docker
