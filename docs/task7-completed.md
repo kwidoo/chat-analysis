@@ -145,7 +145,7 @@ def register_cli_commands(app: Flask):
     def create_roles():
         """Create default roles in the database."""
         from app import app
-        from app.models.user import Role
+        from models.user import Role
 
         try:
             with app.app_context():

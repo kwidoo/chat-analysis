@@ -1,14 +1,14 @@
-from logging.config import fileConfig
 import os
 import sys
+from logging.config import fileConfig
+
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 # This adds the parent directory to the Python path so we can import our app modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from db.session import Base
-import models.user  # Import models to ensure they're registered with SQLAlchemy
 
 # this is the Alembic Config object
 config = context.config

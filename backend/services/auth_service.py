@@ -6,11 +6,11 @@ from typing import Dict, List, Optional
 import bcrypt
 import jwt
 import pyotp
-from app.models.user import RefreshToken, Role
-from app.models.user import User as DBUser
 from db.session import db
 from flask import Request
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+from models.user import RefreshToken, Role
+from models.user import User as DBUser
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
