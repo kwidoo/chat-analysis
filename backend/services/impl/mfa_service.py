@@ -4,6 +4,7 @@ MFA Service Implementation
 This module provides an implementation of the IMFAService interface
 using TOTP (Time-based One-Time Passwords) for multi-factor authentication.
 """
+
 import datetime
 import logging
 import uuid
@@ -58,7 +59,7 @@ class TOTPMFAServiceImpl(IMFAService):
 
         self._mfa_tokens[mfa_token] = {
             "user_id": str(user_id),
-            "exp": expiry.timestamp()
+            "exp": expiry.timestamp(),
         }
 
         return mfa_token
@@ -122,10 +123,7 @@ class TOTPMFAServiceImpl(IMFAService):
         now = datetime.datetime.utcnow().timestamp()
 
         # Find expired tokens
-        expired_tokens = [
-            token for token, data in self._mfa_tokens.items()
-            if data["exp"] < now
-        ]
+        expired_tokens = [token for token, data in self._mfa_tokens.items() if data["exp"] < now]
 
         # Remove expired tokens
         for token in expired_tokens:

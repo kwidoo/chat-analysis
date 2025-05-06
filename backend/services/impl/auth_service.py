@@ -5,6 +5,7 @@ This module provides a composite implementation of the IAuthService interface
 that delegates to specialized services (user, token, MFA) following the
 Interface Segregation Principle (I in SOLID).
 """
+
 import logging
 from typing import Dict, Any, List, Optional
 
@@ -19,10 +20,12 @@ class AuthServiceImpl(IAuthService):
     implementing the Interface Segregation Principle.
     """
 
-    def __init__(self,
-                 user_service: IUserService,
-                 token_service: ITokenService,
-                 mfa_service: IMFAService):
+    def __init__(
+        self,
+        user_service: IUserService,
+        token_service: ITokenService,
+        mfa_service: IMFAService,
+    ):
         """Initialize the auth service
 
         Args:
@@ -85,7 +88,7 @@ class AuthServiceImpl(IAuthService):
         """
         return self.token_service.revoke_token(refresh_token)
 
-    def validate_token(self, token: str, token_type: str = 'access') -> Optional[Dict[str, Any]]:
+    def validate_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
         """Validate a token and return its payload
 
         Args:
@@ -146,7 +149,7 @@ class AuthServiceImpl(IAuthService):
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": self.token_service.token_expiry
+            "expires_in": self.token_service.token_expiry,
         }
 
     def create_default_roles(self) -> None:

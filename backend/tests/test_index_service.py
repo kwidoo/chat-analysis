@@ -1,10 +1,10 @@
-import pytest
-import numpy as np
 import os
-import tempfile
 import shutil
-from unittest.mock import patch, MagicMock
+import tempfile
+from unittest.mock import MagicMock, patch
 
+import numpy as np
+import pytest
 from services.index_service import FaissIndexService, IndexManager
 
 
@@ -26,7 +26,7 @@ def index_manager(temp_index_dir):
 @pytest.fixture
 def mock_faiss():
     """Mock FAISS library for testing"""
-    with patch('services.index_service.faiss') as mock:
+    with patch("services.index_service.faiss") as mock:
         # Simulate index behavior
         mock_index = MagicMock()
         mock_index.ntotal = 0
@@ -37,7 +37,7 @@ def mock_faiss():
         # Set up behavior for search
         mock_index.search.return_value = (
             np.array([[0.1, 0.2, 0.3]]),  # distances
-            np.array([[1, 2, 3]])         # indices
+            np.array([[1, 2, 3]]),  # indices
         )
 
         # Set up read_index behavior to return our mock index
@@ -48,7 +48,7 @@ def mock_faiss():
 
 def test_index_creation(mock_faiss, temp_index_dir):
     """Test creating a new FAISS index"""
-    index_path = os.path.join(temp_index_dir, 'test_index.index')
+    index_path = os.path.join(temp_index_dir, "test_index.index")
     index_service = FaissIndexService(index_path, embedding_dimension=384)
 
     # Verify the index was created with the correct dimension
@@ -60,11 +60,11 @@ def test_index_creation(mock_faiss, temp_index_dir):
 
 def test_adding_embeddings(mock_faiss, temp_index_dir):
     """Test adding embeddings to an index"""
-    index_path = os.path.join(temp_index_dir, 'test_index.index')
+    index_path = os.path.join(temp_index_dir, "test_index.index")
     index_service = FaissIndexService(index_path, embedding_dimension=384)
 
     # Create some test embeddings
-    embeddings = np.random.rand(10, 384).astype('float32')
+    embeddings = np.random.rand(10, 384).astype("float32")
 
     # Add to index
     index_service.add_embeddings(embeddings)
@@ -78,11 +78,11 @@ def test_adding_embeddings(mock_faiss, temp_index_dir):
 
 def test_search_index(mock_faiss, temp_index_dir):
     """Test searching the index"""
-    index_path = os.path.join(temp_index_dir, 'test_index.index')
+    index_path = os.path.join(temp_index_dir, "test_index.index")
     index_service = FaissIndexService(index_path, embedding_dimension=384)
 
     # Create a test query embedding
-    query = np.random.rand(384).astype('float32')
+    query = np.random.rand(384).astype("float32")
 
     # Search the index
     distances, indices = index_service.search(query, k=3)
@@ -99,27 +99,26 @@ def test_search_index(mock_faiss, temp_index_dir):
 def test_index_manager(mock_faiss, index_manager):
     """Test the index manager for creating and getting indexes"""
     # Get index service for a model version
-    index_service = index_manager.get_index_service("model-v1", embedding_dimension=384)
-
-    # Verify index path is correct
     expected_path = os.path.join(index_manager.base_dir, "indexes/model-v1/index.index")
-    assert index_service.index_path == expected_path
+    assert (
+        index_manager.get_index_service("model-v1", embedding_dimension=384).index_path
+        == expected_path
+    )
 
     # Verify index was created
-    assert isinstance(index_service, FaissIndexService)
+    assert isinstance(
+        index_manager.get_index_service("model-v1", embedding_dimension=384), FaissIndexService
+    )
 
 
 def test_loading_existing_index(mock_faiss, temp_index_dir):
     """Test loading an existing index"""
-    index_path = os.path.join(temp_index_dir, 'test_index.index')
+    index_path = os.path.join(temp_index_dir, "test_index.index")
 
     # Set up the index path to exist
     os.makedirs(os.path.dirname(index_path), exist_ok=True)
-    with open(index_path, 'w') as f:
+    with open(index_path, "w") as f:
         f.write("mock index file")
-
-    # Create index service (should load existing index)
-    index_service = FaissIndexService(index_path)
 
     # Verify read_index was called with correct path
     mock_faiss.read_index.assert_called_once_with(index_path)

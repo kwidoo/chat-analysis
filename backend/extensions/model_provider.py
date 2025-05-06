@@ -4,6 +4,7 @@ Model Provider Extension
 This module defines the BaseModelProvider interface and registerable provider classes,
 implementing the Open/Closed Principle (O in SOLID).
 """
+
 import logging
 from typing import Dict, List, Any, Optional, Type
 
@@ -13,11 +14,11 @@ from interfaces.embedding import IModelProvider, IEmbeddingService
 class ModelProviderRegistry:
     """Registry for model providers that allows dynamic registration"""
 
-    _providers: Dict[str, Type['BaseModelProvider']] = {}
+    _providers: Dict[str, Type["BaseModelProvider"]] = {}
     _logger = logging.getLogger(__name__)
 
     @classmethod
-    def register_provider(cls, provider_class: Type['BaseModelProvider']) -> None:
+    def register_provider(cls, provider_class: Type["BaseModelProvider"]) -> None:
         """Register a model provider
 
         Args:
@@ -28,7 +29,7 @@ class ModelProviderRegistry:
         cls._logger.info(f"Registered model provider: {provider_name}")
 
     @classmethod
-    def get_provider(cls, provider_name: str) -> Optional['BaseModelProvider']:
+    def get_provider(cls, provider_name: str) -> Optional["BaseModelProvider"]:
         """Get a model provider by name
 
         Args:
@@ -68,8 +69,9 @@ class BaseModelProvider(IModelProvider):
         name = cls.__name__.replace("Provider", "")
         return name.lower()
 
-    def get_embedding_service(self, model_name: str,
-                             distributed_client: Optional[Any] = None) -> IEmbeddingService:
+    def get_embedding_service(
+        self, model_name: str, distributed_client: Optional[Any] = None
+    ) -> IEmbeddingService:
         """Get an embedding service for a model
 
         This method should be implemented by subclasses.

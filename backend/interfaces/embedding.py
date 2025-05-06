@@ -4,6 +4,7 @@ Embedding Service Interfaces
 This module defines interfaces for embedding-related services,
 implementing the Interface Segregation Principle (I in SOLID).
 """
+
 from abc import ABC, abstractmethod
 from typing import List, Any, Optional
 
@@ -62,8 +63,9 @@ class IModelProvider(ABC):
     """
 
     @abstractmethod
-    def get_embedding_service(self, model_name: str,
-                              distributed_client: Optional[Any] = None) -> IEmbeddingService:
+    def get_embedding_service(
+        self, model_name: str, distributed_client: Optional[Any] = None
+    ) -> IEmbeddingService:
         """Get an embedding service for a model
 
         Args:

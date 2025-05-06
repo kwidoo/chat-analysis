@@ -1,16 +1,16 @@
-import os
 import json
 import logging
+import os
 import threading
 import time
-from datetime import datetime
-from typing import Dict, Any, List, Optional, Callable
 import traceback
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional
 
-from services.message_broker import MessageBrokerInterface
 from services.embedding_service import EmbeddingServiceInterface
+from services.file_processor_producer import FILE_PROCESSING_QUEUE, TASK_TRACKING_QUEUE
 from services.index_service import IndexServiceInterface
-from services.file_processor_producer import TASK_TRACKING_QUEUE, FILE_PROCESSING_QUEUE
+from services.message_broker import MessageBrokerInterface
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,10 @@ class CircuitBreaker:
         with self._lock:
             if self.state == "OPEN":
                 # Check if reset timeout has elapsed
-                if self.last_failure_time and time.time() - self.last_failure_time >= self.reset_timeout:
+                if (
+                    self.last_failure_time
+                    and time.time() - self.last_failure_time >= self.reset_timeout
+                ):
                     logger.info("Circuit breaker reset timeout elapsed, moving to half-open state")
                     self.state = "HALF-OPEN"
                 else:
@@ -72,7 +75,10 @@ class CircuitBreaker:
                 self.failure_count += 1
 
                 if self.failure_count >= self.failure_threshold:
-                    logger.warning(f"Circuit breaker threshold reached ({self.failure_count} failures), opening circuit")
+                    logger.warning(
+                        f"Circuit breaker threshold reached ({self.failure_count} failures), "
+                        f"opening circuit"
+                    )
                     self.state = "OPEN"
 
                 raise e
@@ -80,14 +86,20 @@ class CircuitBreaker:
 
 class CircuitBreakerOpenError(Exception):
     """Exception raised when the circuit breaker is open"""
+
     pass
 
 
 class RetryPolicy:
     """Retry policy for handling transient failures"""
 
-    def __init__(self, max_retries: int = 3, retry_delay: int = 5,
-                 backoff_factor: float = 1.5, max_delay: int = 60):
+    def __init__(
+        self,
+        max_retries: int = 3,
+        retry_delay: int = 5,
+        backoff_factor: float = 1.5,
+        max_delay: int = 60,
+    ):
         """Initialize the retry policy
 
         Args:
@@ -132,7 +144,9 @@ class RetryPolicy:
                     logger.error(f"Max retries ({self.max_retries}) exceeded: {e}")
                     raise
 
-                logger.warning(f"Retry {retries}/{self.max_retries} after error: {e}. Waiting {delay}s")
+                logger.warning(
+                    f"Retry {retries}/{self.max_retries} after error: {e}. Waiting {delay}s"
+                )
                 time.sleep(delay)
 
                 # Increase delay for next retry
@@ -145,11 +159,14 @@ class FileProcessorConsumer:
     This service consumes file processing tasks from the queue and processes them.
     """
 
-    def __init__(self, broker: MessageBrokerInterface,
-                 embedding_service: EmbeddingServiceInterface,
-                 index_service: IndexServiceInterface,
-                 task_store_dir: str,
-                 prefetch: int = 1):
+    def __init__(
+        self,
+        broker: MessageBrokerInterface,
+        embedding_service: EmbeddingServiceInterface,
+        index_service: IndexServiceInterface,
+        task_store_dir: str,
+        prefetch: int = 1,
+    ):
         """Initialize the file processor consumer
 
         Args:
@@ -224,25 +241,31 @@ class FileProcessorConsumer:
             self.retry_policy.execute(
                 self.circuit_breaker.execute,
                 self._extract_and_index_embeddings,
-                file_path, file_content, metadata
+                file_path,
+                file_content,
+                metadata,
             )
 
             # Update task status to completed
-            self._update_task_status(task_id, "completed", {
-                "processing_time": datetime.now().isoformat(),
-                "success": True
-            })
+            self._update_task_status(
+                task_id,
+                "completed",
+                {"processing_time": datetime.now().isoformat(), "success": True},
+            )
 
         except Exception as e:
             logger.error(f"Error processing task {task_id}: {e}\n{traceback.format_exc()}")
 
             # Update task status to failed
-            self._update_task_status(task_id, "failed", {
-                "error": str(e),
-                "traceback": traceback.format_exc()
-            })
+            self._update_task_status(
+                task_id,
+                "failed",
+                {"error": str(e), "traceback": traceback.format_exc()},
+            )
 
-    def _extract_and_index_embeddings(self, file_path: str, file_content: str, metadata: Dict[str, Any]) -> None:
+    def _extract_and_index_embeddings(
+        self, file_path: str, file_content: str, metadata: Dict[str, Any]
+    ) -> None:
         """Extract and index embeddings from a file
 
         Args:
@@ -255,13 +278,15 @@ class FileProcessorConsumer:
 
         messages = []
         try:
-            if file_ext == '.json':
+            if file_ext == ".json":
                 # Parse JSON file
                 data = json.loads(file_content)
 
                 # Extract messages from JSON
                 if "messages" in data:
-                    messages = [msg.get('content', '') for msg in data["messages"] if 'content' in msg]
+                    messages = [
+                        msg.get("content", "") for msg in data["messages"] if "content" in msg
+                    ]
                 elif "text" in data:
                     messages = [data["text"]]
             else:
@@ -280,7 +305,9 @@ class FileProcessorConsumer:
         # Add to index
         self.index_service.add_embeddings(embeddings)
 
-    def _update_task_status(self, task_id: str, status: str, metadata: Dict[str, Any] = None) -> None:
+    def _update_task_status(
+        self, task_id: str, status: str, metadata: Dict[str, Any] = None
+    ) -> None:
         """Update task status
 
         Args:
@@ -294,12 +321,12 @@ class FileProcessorConsumer:
             current_status = {}
 
             if os.path.exists(task_file):
-                with open(task_file, 'r') as f:
+                with open(task_file, "r") as f:
                     current_status = json.load(f)
             else:
                 current_status = {
                     "task_id": task_id,
-                    "created_at": datetime.now().isoformat()
+                    "created_at": datetime.now().isoformat(),
                 }
 
             # Update status and metadata
@@ -312,16 +339,19 @@ class FileProcessorConsumer:
                 current_status["metadata"].update(metadata)
 
             # Save updated status
-            with open(task_file, 'w') as f:
+            with open(task_file, "w") as f:
                 json.dump(current_status, f, indent=2)
 
             # Publish status update to tracking queue
-            self.broker.publish(TASK_TRACKING_QUEUE, {
-                "task_id": task_id,
-                "status": status,
-                "updated_at": current_status["updated_at"],
-                "metadata": metadata or {}
-            })
+            self.broker.publish(
+                TASK_TRACKING_QUEUE,
+                {
+                    "task_id": task_id,
+                    "status": status,
+                    "updated_at": current_status["updated_at"],
+                    "metadata": metadata or {},
+                },
+            )
 
         except Exception as e:
             logger.error(f"Error updating task status for {task_id}: {e}")
@@ -330,11 +360,14 @@ class FileProcessorConsumer:
 class SupervisorProcess:
     """Supervisor process for managing consumer workers"""
 
-    def __init__(self, broker: MessageBrokerInterface,
-                 embedding_service: EmbeddingServiceInterface,
-                 index_service: IndexServiceInterface,
-                 task_store_dir: str,
-                 worker_count: int = 3):
+    def __init__(
+        self,
+        broker: MessageBrokerInterface,
+        embedding_service: EmbeddingServiceInterface,
+        index_service: IndexServiceInterface,
+        task_store_dir: str,
+        worker_count: int = 3,
+    ):
         """Initialize the supervisor process
 
         Args:
@@ -366,7 +399,7 @@ class SupervisorProcess:
                 self.broker,
                 self.embedding_service,
                 self.index_service,
-                self.task_store_dir
+                self.task_store_dir,
             )
             worker.start()
             self.workers.append(worker)
@@ -404,7 +437,7 @@ class SupervisorProcess:
                         self.broker,
                         self.embedding_service,
                         self.index_service,
-                        self.task_store_dir
+                        self.task_store_dir,
                     )
                     new_worker.start()
 

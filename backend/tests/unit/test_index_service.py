@@ -1,9 +1,10 @@
-import pytest
-import numpy as np
 import os
-import tempfile
 import shutil
+import tempfile
 import threading
+
+import numpy as np
+import pytest
 from services.index_service import FaissIndexService, IndexManager
 
 
@@ -18,7 +19,7 @@ class TestFaissIndexService:
     @pytest.fixture
     def index_path(self, temp_dir):
         """Fixture for a temporary index path"""
-        return os.path.join(temp_dir, 'test_index.index')
+        return os.path.join(temp_dir, "test_index.index")
 
     def test_create_new_index(self, index_path):
         """Test creating a new index"""
@@ -26,7 +27,7 @@ class TestFaissIndexService:
         service = FaissIndexService(index_path, embedding_dimension)
 
         assert service.get_total() == 0
-        assert os.path.exists(index_path) == False  # Index is not saved until add_embeddings is called
+        assert not os.path.exists(index_path)  # Index is not saved until add_embeddings is called
 
     def test_add_embeddings(self, index_path):
         """Test adding embeddings to the index"""
@@ -34,7 +35,7 @@ class TestFaissIndexService:
         service = FaissIndexService(index_path, embedding_dimension)
 
         # Generate random embeddings
-        embeddings = np.random.random((5, embedding_dimension)).astype('float32')
+        embeddings = np.random.random((5, embedding_dimension)).astype("float32")
 
         # Add to index
         service.add_embeddings(embeddings)
@@ -49,7 +50,7 @@ class TestFaissIndexService:
         service = FaissIndexService(index_path, embedding_dimension)
 
         # Generate random embeddings
-        embeddings = np.random.random((10, embedding_dimension)).astype('float32')
+        embeddings = np.random.random((10, embedding_dimension)).astype("float32")
 
         # Add to index
         service.add_embeddings(embeddings)
@@ -67,7 +68,7 @@ class TestFaissIndexService:
         service = FaissIndexService(index_path, embedding_dimension)
 
         # Generate query embedding
-        query = np.random.random(embedding_dimension).astype('float32')
+        query = np.random.random(embedding_dimension).astype("float32")
 
         # Search empty index
         distances, indices = service.search(query, 3)
@@ -90,8 +91,8 @@ class TestIndexManager:
         """Test that index paths are constructed correctly"""
         manager = IndexManager(temp_dir)
 
-        path = manager.get_index_path('v1')
-        expected_path = os.path.join(temp_dir, 'indexes/v1/index.index')
+        path = manager.get_index_path("v1")
+        expected_path = os.path.join(temp_dir, "indexes/v1/index.index")
 
         assert path == expected_path
 
@@ -101,7 +102,7 @@ class TestIndexManager:
 
         # Create an index service
         embedding_dimension = 128
-        service = manager.get_index_service('v1', embedding_dimension)
+        service = manager.get_index_service("v1", embedding_dimension)
 
         assert isinstance(service, FaissIndexService)
-        assert service.index_path == os.path.join(temp_dir, 'indexes/v1/index.index')
+        assert service.index_path == os.path.join(temp_dir, "indexes/v1/index.index")

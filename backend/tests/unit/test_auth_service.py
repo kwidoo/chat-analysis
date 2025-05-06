@@ -1,6 +1,7 @@
-import pytest
 import time
-from services.auth_service import AuthService, User
+
+import pytest
+from services.auth_service import AuthService
 
 
 class TestAuthService:
@@ -13,16 +14,14 @@ class TestAuthService:
         return AuthService(
             secret_key="test-secret-key",
             token_expiry=5,  # 5 seconds
-            refresh_expiry=10  # 10 seconds
+            refresh_expiry=10,  # 10 seconds
         )
 
     @pytest.fixture
     def test_user(self, auth_service):
         """Create a test user for authentication tests."""
         return auth_service.create_user(
-            username="testuser",
-            password="testpassword",
-            roles=["user", "editor"]
+            username="testuser", password="testpassword", roles=["user", "editor"]
         )
 
     def test_create_user(self, auth_service):
@@ -99,19 +98,22 @@ class TestAuthService:
 
     def test_token_revocation(self, auth_service, test_user):
         """Test token revocation functionality."""
-        # Generate tokens
-        tokens = auth_service.generate_token_pair(test_user)
-
         # Revoke refresh token
-        revoked = auth_service.revoke_token(tokens["refresh_token"])
+        revoked = auth_service.revoke_token(
+            auth_service.generate_token_pair(test_user)["refresh_token"]
+        )
         assert revoked is True
 
         # Attempt to use revoked token
-        new_tokens = auth_service.refresh_token(tokens["refresh_token"])
+        new_tokens = auth_service.refresh_token(
+            auth_service.generate_token_pair(test_user)["refresh_token"]
+        )
         assert new_tokens is None
 
         # Attempt to revoke access token (should fail as only refresh tokens can be revoked)
-        revoked = auth_service.revoke_token(tokens["access_token"])
+        revoked = auth_service.revoke_token(
+            auth_service.generate_token_pair(test_user)["access_token"]
+        )
         assert revoked is False
 
     def test_token_expiry(self, auth_service, test_user):
@@ -132,8 +134,6 @@ class TestAuthService:
 
     def test_clean_expired_tokens(self, auth_service, test_user):
         """Test cleaning up expired refresh tokens."""
-        # Generate tokens
-        tokens = auth_service.generate_token_pair(test_user)
 
         # Token should be registered in user's refresh_tokens
         refresh_tokens_count = len(test_user.refresh_tokens)

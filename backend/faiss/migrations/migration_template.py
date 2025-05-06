@@ -57,7 +57,9 @@ def migrate_index(params: Dict[str, Any]) -> bool:
             source_index = faiss.read_index(source_path)
             logger.info(f"Loaded source index with {source_index.ntotal} vectors")
         else:
-            logger.warning(f"Source index not found at {source_path}, creating new index")
+            logger.warning(
+                f"Source index not found at {source_path}, creating new index"
+            )
             source_index = faiss.IndexFlatL2(dim)
 
         # Customize this part for specific migration logic

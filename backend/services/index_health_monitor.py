@@ -27,20 +27,20 @@ class IndexHealthMonitor:
                 - VACUUM_THRESHOLD: Percent of fragmentation to trigger vacuum (default: 20)
                 - VACUUM_INTERVAL: Minimum hours between vacuums (default: 24)
         """
-        self.faiss_dir = Path(config.get('FAISS_DIR', './faiss'))
-        self.active_model = config.get('ACTIVE_MODEL', 'v1')
+        self.faiss_dir = Path(config.get("FAISS_DIR", "./faiss"))
+        self.active_model = config.get("ACTIVE_MODEL", "v1")
 
         # Monitoring settings
-        self.health_check_interval = config.get('HEALTH_CHECK_INTERVAL', 60)  # seconds
-        self.vacuum_threshold = config.get('VACUUM_THRESHOLD', 20)  # percent fragmentation
-        self.vacuum_interval = config.get('VACUUM_INTERVAL', 24)  # hours
+        self.health_check_interval = config.get("HEALTH_CHECK_INTERVAL", 60)  # seconds
+        self.vacuum_threshold = config.get("VACUUM_THRESHOLD", 20)  # percent fragmentation
+        self.vacuum_interval = config.get("VACUUM_INTERVAL", 24)  # hours
 
         # Paths
-        self.index_dir = self.faiss_dir / 'indexes'
-        self.active_index_path = self.index_dir / self.active_model / 'index.index'
-        self.metrics_dir = self.faiss_dir / 'metrics'
+        self.index_dir = self.faiss_dir / "indexes"
+        self.active_index_path = self.index_dir / self.active_model / "index.index"
+        self.metrics_dir = self.faiss_dir / "metrics"
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
-        self.health_log_path = self.metrics_dir / 'health_metrics.json'
+        self.health_log_path = self.metrics_dir / "health_metrics.json"
 
         # Internal state
         self._running = False
@@ -56,12 +56,12 @@ class IndexHealthMonitor:
 
         self._running = True
         self._monitor_thread = threading.Thread(
-            target=self._monitoring_loop,
-            daemon=True,
-            name="IndexHealthMonitor"
+            target=self._monitoring_loop, daemon=True, name="IndexHealthMonitor"
         )
         self._monitor_thread.start()
-        logger.info(f"Started FAISS index health monitoring with interval: {self.health_check_interval}s")
+        logger.info(
+            f"Started FAISS index health monitoring with interval: {self.health_check_interval}s"
+        )
 
     def stop_monitoring(self):
         """Stop the monitoring thread"""
@@ -80,16 +80,13 @@ class IndexHealthMonitor:
         metrics = {
             "timestamp": datetime.now().isoformat(),
             "index_path": str(self.active_index_path),
-            "status": "unknown"
+            "status": "unknown",
         }
 
         try:
             # Check if index file exists
             if not self.active_index_path.exists():
-                metrics.update({
-                    "status": "missing",
-                    "error": "Index file not found"
-                })
+                metrics.update({"status": "missing", "error": "Index file not found"})
                 return metrics
 
             # Check file stats
@@ -100,19 +97,21 @@ class IndexHealthMonitor:
             # This is a basic integrity check that completes in <1s
             index = faiss.read_index(str(self.active_index_path))
 
-            metrics.update({
-                "status": "healthy",
-                "ntotal": index.ntotal,
-                "dimension": index.d,
-                "index_type": type(index).__name__,
-                "check_time_ms": int((time.time() - start_time) * 1000)
-            })
+            metrics.update(
+                {
+                    "status": "healthy",
+                    "ntotal": index.ntotal,
+                    "dimension": index.d,
+                    "index_type": type(index).__name__,
+                    "check_time_ms": int((time.time() - start_time) * 1000),
+                }
+            )
 
             # Run basic search test if the index has vectors
             if index.ntotal > 0:
                 try:
                     # Generate a random query vector
-                    query = np.random.random(index.d).astype('float32').reshape(1, -1)
+                    query = np.random.random(index.d).astype("float32").reshape(1, -1)
 
                     # Time the search operation
                     search_start = time.time()
@@ -132,10 +131,12 @@ class IndexHealthMonitor:
             # Calculate fragmentation (simplified)
             # In a real implementation, you would need a model-specific approach
             # as different index types have different fragmentation characteristics
-            if hasattr(index, 'ntotal') and hasattr(index, 'ntotal_2'):
+            if hasattr(index, "ntotal") and hasattr(index, "ntotal_2"):
                 # This is hypothetical - FAISS doesn't actually have ntotal_2
                 # You'd need to implement your own fragmentation detection logic
-                fragmentation = (1 - (index.ntotal_2 / index.ntotal)) * 100 if index.ntotal > 0 else 0
+                fragmentation = (
+                    (1 - (index.ntotal_2 / index.ntotal)) * 100 if index.ntotal > 0 else 0
+                )
                 metrics["fragmentation_percent"] = fragmentation
 
                 if fragmentation > self.vacuum_threshold:
@@ -150,11 +151,7 @@ class IndexHealthMonitor:
         except Exception as e:
             elapsed_ms = int((time.time() - start_time) * 1000)
             logger.error(f"Health check failed in {elapsed_ms}ms: {e}")
-            metrics.update({
-                "status": "error",
-                "error": str(e),
-                "check_time_ms": elapsed_ms
-            })
+            metrics.update({"status": "error", "error": str(e), "check_time_ms": elapsed_ms})
             return metrics
 
     def vacuum_index(self) -> Dict[str, Any]:
@@ -167,7 +164,7 @@ class IndexHealthMonitor:
         result = {
             "timestamp": datetime.now().isoformat(),
             "index_path": str(self.active_index_path),
-            "status": "started"
+            "status": "started",
         }
 
         try:
@@ -177,9 +174,10 @@ class IndexHealthMonitor:
                 return result
 
             # Create a backup before vacuum
-            backup_path = self.active_index_path.with_suffix('.index.bak')
+            backup_path = self.active_index_path.with_suffix(".index.bak")
             try:
                 import shutil
+
                 shutil.copy2(self.active_index_path, backup_path)
                 result["backup_created"] = True
                 result["backup_path"] = str(backup_path)
@@ -200,7 +198,7 @@ class IndexHealthMonitor:
 
             # For this example, we'll just re-save the index which can sometimes
             # optimize storage in real FAISS implementations
-            temp_path = self.active_index_path.with_suffix('.index.temp')
+            temp_path = self.active_index_path.with_suffix(".index.temp")
             faiss.write_index(index, str(temp_path))
 
             # Replace the original with the new one
@@ -216,27 +214,34 @@ class IndexHealthMonitor:
             self._save_last_vacuum_time()
 
             # Return results
-            result.update({
-                "status": "completed",
-                "original_size_bytes": original_size,
-                "new_size_bytes": new_size,
-                "size_reduction_bytes": original_size - new_size,
-                "size_reduction_percent":
-                    round((original_size - new_size) / original_size * 100, 2) if original_size > 0 else 0,
-                "original_count": original_count,
-                "new_count": new_count,
-                "duration_seconds": round(time.time() - start_time, 2)
-            })
+            result.update(
+                {
+                    "status": "completed",
+                    "original_size_bytes": original_size,
+                    "new_size_bytes": new_size,
+                    "size_reduction_bytes": original_size - new_size,
+                    "size_reduction_percent": (
+                        round((original_size - new_size) / original_size * 100, 2)
+                        if original_size > 0
+                        else 0
+                    ),
+                    "original_count": original_count,
+                    "new_count": new_count,
+                    "duration_seconds": round(time.time() - start_time, 2),
+                }
+            )
 
             return result
 
         except Exception as e:
             logger.error(f"Vacuum operation failed: {e}")
-            result.update({
-                "status": "failed",
-                "error": str(e),
-                "duration_seconds": round(time.time() - start_time, 2)
-            })
+            result.update(
+                {
+                    "status": "failed",
+                    "error": str(e),
+                    "duration_seconds": round(time.time() - start_time, 2),
+                }
+            )
             return result
 
     def detect_corruption(self) -> Dict[str, Any]:
@@ -249,7 +254,7 @@ class IndexHealthMonitor:
         result = {
             "timestamp": datetime.now().isoformat(),
             "index_path": str(self.active_index_path),
-            "status": "unknown"
+            "status": "unknown",
         }
 
         try:
@@ -276,11 +281,11 @@ class IndexHealthMonitor:
                 index = faiss.read_index(str(self.active_index_path))
 
                 # Check if basic attributes are available
-                assert hasattr(index, 'ntotal'), "Missing ntotal attribute"
-                assert hasattr(index, 'd'), "Missing dimension attribute"
+                assert hasattr(index, "ntotal"), "Missing ntotal attribute"
+                assert hasattr(index, "d"), "Missing dimension attribute"
 
                 # For IVF-type indices, check list structure
-                if hasattr(index, 'nlist'):
+                if hasattr(index, "nlist"):
                     assert index.nlist > 0, "Invalid nlist value"
 
                 result["structure_check"] = "passed"
@@ -304,11 +309,13 @@ class IndexHealthMonitor:
 
         except Exception as e:
             logger.error(f"Corruption detection failed: {e}")
-            result.update({
-                "status": "error",
-                "error": str(e),
-                "check_time_ms": int((time.time() - start_time) * 1000)
-            })
+            result.update(
+                {
+                    "status": "error",
+                    "error": str(e),
+                    "check_time_ms": int((time.time() - start_time) * 1000),
+                }
+            )
             return result
 
     def _monitoring_loop(self):
@@ -371,7 +378,7 @@ class IndexHealthMonitor:
             # Load existing metrics
             existing_metrics = []
             if self.health_log_path.exists():
-                with open(self.health_log_path, 'r') as f:
+                with open(self.health_log_path, "r") as f:
                     existing_metrics = json.load(f)
 
             # Add new metrics
@@ -382,7 +389,7 @@ class IndexHealthMonitor:
                 existing_metrics = existing_metrics[-max_entries:]
 
             # Save updated metrics
-            with open(self.health_log_path, 'w') as f:
+            with open(self.health_log_path, "w") as f:
                 json.dump(existing_metrics, f, indent=2)
 
         except Exception as e:
@@ -394,13 +401,13 @@ class IndexHealthMonitor:
         Args:
             vacuum_result: Vacuum operation results
         """
-        vacuum_log_path = self.metrics_dir / 'vacuum_log.json'
+        vacuum_log_path = self.metrics_dir / "vacuum_log.json"
 
         try:
             # Load existing log
             existing_log = []
             if vacuum_log_path.exists():
-                with open(vacuum_log_path, 'r') as f:
+                with open(vacuum_log_path, "r") as f:
                     existing_log = json.load(f)
 
             # Add new entry
@@ -411,7 +418,7 @@ class IndexHealthMonitor:
                 existing_log = existing_log[-50:]
 
             # Save updated log
-            with open(vacuum_log_path, 'w') as f:
+            with open(vacuum_log_path, "w") as f:
                 json.dump(existing_log, f, indent=2)
 
             # Update last vacuum time
@@ -427,11 +434,11 @@ class IndexHealthMonitor:
         Returns:
             Optional[datetime]: Timestamp of last vacuum or None
         """
-        vacuum_time_path = self.metrics_dir / 'last_vacuum_time.txt'
+        vacuum_time_path = self.metrics_dir / "last_vacuum_time.txt"
 
         if vacuum_time_path.exists():
             try:
-                with open(vacuum_time_path, 'r') as f:
+                with open(vacuum_time_path, "r") as f:
                     timestamp_str = f.read().strip()
                     return datetime.fromisoformat(timestamp_str)
             except Exception:
@@ -444,10 +451,10 @@ class IndexHealthMonitor:
         if not self._last_vacuum_time:
             return
 
-        vacuum_time_path = self.metrics_dir / 'last_vacuum_time.txt'
+        vacuum_time_path = self.metrics_dir / "last_vacuum_time.txt"
 
         try:
-            with open(vacuum_time_path, 'w') as f:
+            with open(vacuum_time_path, "w") as f:
                 f.write(self._last_vacuum_time.isoformat())
         except Exception as e:
             logger.error(f"Failed to save vacuum timestamp: {e}")
@@ -462,7 +469,7 @@ class IndexHealthMonitor:
             return {}
 
         try:
-            with open(self.health_log_path, 'r') as f:
+            with open(self.health_log_path, "r") as f:
                 metrics_list = json.load(f)
                 if metrics_list and len(metrics_list) > 0:
                     return metrics_list[-1]

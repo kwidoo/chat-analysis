@@ -4,6 +4,7 @@ JWT Token Service Implementation
 This module provides an implementation of the ITokenService interface
 using JSON Web Tokens (JWT) for authentication.
 """
+
 import datetime
 import logging
 import jwt
@@ -45,18 +46,13 @@ class JWTTokenServiceImpl(ITokenService):
         now = datetime.datetime.utcnow()
         expiry = now + datetime.timedelta(seconds=self.token_expiry)
 
-        payload = {
-            'exp': expiry,
-            'iat': now,
-            'sub': str(user_id),
-            'type': 'access'
-        }
+        payload = {"exp": expiry, "iat": now, "sub": str(user_id), "type": "access"}
 
-        token = jwt.encode(payload, self.secret_key, algorithm='HS256')
+        token = jwt.encode(payload, self.secret_key, algorithm="HS256")
 
         # Convert bytes to string if necessary (depending on PyJWT version)
         if isinstance(token, bytes):
-            token = token.decode('utf-8')
+            token = token.decode("utf-8")
 
         return token
 
@@ -76,28 +72,28 @@ class JWTTokenServiceImpl(ITokenService):
         refresh_token_id = str(uuid.uuid4())
 
         payload = {
-            'exp': expiry,
-            'iat': now,
-            'sub': str(user_id),
-            'jti': refresh_token_id,  # JWT ID - unique identifier
-            'type': 'refresh'
+            "exp": expiry,
+            "iat": now,
+            "sub": str(user_id),
+            "jti": refresh_token_id,  # JWT ID - unique identifier
+            "type": "refresh",
         }
 
-        token = jwt.encode(payload, self.secret_key, algorithm='HS256')
+        token = jwt.encode(payload, self.secret_key, algorithm="HS256")
 
         # Convert bytes to string if necessary
         if isinstance(token, bytes):
-            token = token.decode('utf-8')
+            token = token.decode("utf-8")
 
         # Store the refresh token for validation
         self._refresh_tokens[refresh_token_id] = {
             "user_id": str(user_id),
-            "exp": expiry.timestamp()
+            "exp": expiry.timestamp(),
         }
 
         return token
 
-    def validate_token(self, token: str, token_type: str = 'access') -> Optional[Dict[str, Any]]:
+    def validate_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
         """Validate a token and return its payload
 
         Args:
@@ -109,16 +105,18 @@ class JWTTokenServiceImpl(ITokenService):
         """
         try:
             # Decode the token
-            payload = jwt.decode(token, self.secret_key, algorithms=['HS256'])
+            payload = jwt.decode(token, self.secret_key, algorithms=["HS256"])
 
             # Check token type
-            if payload.get('type') != token_type:
-                self.logger.warning(f"Token type mismatch: expected {token_type}, got {payload.get('type')}")
+            if payload.get("type") != token_type:
+                self.logger.warning(
+                    f"Token type mismatch: expected {token_type}, got {payload.get('type')}"
+                )
                 return None
 
             # For refresh tokens, also check if it's in our store
-            if token_type == 'refresh' and 'jti' in payload:
-                if payload['jti'] not in self._refresh_tokens:
+            if token_type == "refresh" and "jti" in payload:
+                if payload["jti"] not in self._refresh_tokens:
                     self.logger.warning(f"Refresh token not found in store: {payload['jti']}")
                     return None
 
@@ -143,12 +141,12 @@ class JWTTokenServiceImpl(ITokenService):
             Dictionary with new access and refresh tokens, or None if invalid
         """
         # Validate the refresh token
-        payload = self.validate_token(refresh_token, token_type='refresh')
+        payload = self.validate_token(refresh_token, token_type="refresh")
         if not payload:
             return None
 
-        user_id = payload['sub']
-        token_id = payload['jti']
+        user_id = payload["sub"]
+        token_id = payload["jti"]
 
         # Revoke the old refresh token
         if token_id in self._refresh_tokens:
@@ -160,9 +158,9 @@ class JWTTokenServiceImpl(ITokenService):
 
         # Return the new tokens
         return {
-            'access_token': new_access_token,
-            'refresh_token': new_refresh_token,
-            'expires_in': self.token_expiry
+            "access_token": new_access_token,
+            "refresh_token": new_refresh_token,
+            "expires_in": self.token_expiry,
         }
 
     def revoke_token(self, refresh_token: str) -> bool:
@@ -176,8 +174,8 @@ class JWTTokenServiceImpl(ITokenService):
         """
         try:
             # Decode the token without validation to get the token ID
-            payload = jwt.decode(refresh_token, self.secret_key, algorithms=['HS256'])
-            token_id = payload.get('jti')
+            payload = jwt.decode(refresh_token, self.secret_key, algorithms=["HS256"])
+            token_id = payload.get("jti")
 
             # Remove the token from the store if it exists
             if token_id in self._refresh_tokens:
@@ -196,8 +194,7 @@ class JWTTokenServiceImpl(ITokenService):
 
         # Find expired tokens
         expired_tokens = [
-            token_id for token_id, data in self._refresh_tokens.items()
-            if data['exp'] < now
+            token_id for token_id, data in self._refresh_tokens.items() if data["exp"] < now
         ]
 
         # Remove expired tokens

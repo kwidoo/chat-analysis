@@ -4,12 +4,12 @@ Embedding Service for document embeddings
 This module provides embedding services for various models, now refactored to use
 the model provider registry for better extensibility (Open/Closed Principle).
 """
-import os
-import logging
-from typing import Dict, List, Any, Optional
 
-from interfaces.embedding import IEmbeddingService
+import logging
+from typing import Any, Dict, List, Optional
+
 from extensions.model_provider import ModelProviderRegistry
+from interfaces.embedding import IEmbeddingService
 
 
 class ModelRegistry:
@@ -21,7 +21,7 @@ class ModelRegistry:
     # Legacy model mapping - deprecated in favor of providers but kept for backward compatibility
     MODELS = {
         "v1": "Sentence Transformer MPNet Base",
-        "v2": "Sentence Transformer MiniLM L6"
+        "v2": "Sentence Transformer MiniLM L6",
     }
 
     # Default model to use if none specified
@@ -34,11 +34,13 @@ class ModelRegistry:
     PROVIDER_MODELS = {
         "v1": ("huggingface", "mpnet-base"),
         "v2": ("huggingface", "minilm-l6"),
-        "v3": ("openai", "ada")
+        "v3": ("openai", "ada"),
     }
 
     @classmethod
-    def get_embedding_service(cls, model_version: str, distributed_client: Optional[Any] = None) -> IEmbeddingService:
+    def get_embedding_service(
+        cls, model_version: str, distributed_client: Optional[Any] = None
+    ) -> IEmbeddingService:
         """Get an embedding service for a model version
 
         Args:
@@ -62,7 +64,10 @@ class ModelRegistry:
             # Get the provider from the registry
             provider = ModelProviderRegistry.get_provider(provider_name)
             if not provider:
-                logger.warning(f"Provider {provider_name} not found for model {model_version}, trying default provider")
+                logger.warning(
+                    f"Provider {provider_name} not found for model {model_version}, "
+                    f"trying default provider"
+                )
                 provider = ModelProviderRegistry.get_provider(cls.DEFAULT_PROVIDER)
                 if not provider:
                     raise ValueError(f"Default provider {cls.DEFAULT_PROVIDER} not found")
@@ -74,10 +79,12 @@ class ModelRegistry:
         logger.warning(f"Using legacy model initialization for {model_version}")
         if model_version == "v1":
             from sentence_transformers import SentenceTransformer
+
             model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
             return LegacySentenceTransformerService(model, model_version)
         elif model_version == "v2":
             from sentence_transformers import SentenceTransformer
+
             model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
             return LegacySentenceTransformerService(model, model_version)
         else:

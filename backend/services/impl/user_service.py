@@ -4,6 +4,7 @@ User Service Implementation
 This module provides an implementation of the IUserService interface
 managing user accounts, authentication and role management.
 """
+
 import logging
 import bcrypt
 from typing import Dict, Any, List, Optional
@@ -59,7 +60,7 @@ class UserServiceImpl(IUserService):
             password_hash=password_hash,
             roles=roles,
             mfa_enabled=False,
-            mfa_secret=None
+            mfa_secret=None,
         )
 
         # Save the user to the database
@@ -94,10 +95,7 @@ class UserServiceImpl(IUserService):
                 # Generate an MFA token for verification
                 mfa_token = self.mfa_service.generate_mfa_token(user.id)
 
-                return {
-                    "requires_mfa": True,
-                    "mfa_token": mfa_token
-                }
+                return {"requires_mfa": True, "mfa_token": mfa_token}
 
             # No MFA required, generate tokens
             access_token = self.token_service.generate_access_token(user.id)
@@ -106,7 +104,7 @@ class UserServiceImpl(IUserService):
             return {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
-                "expires_in": self.token_service.token_expiry
+                "expires_in": self.token_service.token_expiry,
             }
 
         except NoResultFound:
@@ -206,7 +204,7 @@ class UserServiceImpl(IUserService):
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": self.token_service.token_expiry
+            "expires_in": self.token_service.token_expiry,
         }
 
     def _hash_password(self, password: str) -> str:
@@ -220,10 +218,10 @@ class UserServiceImpl(IUserService):
         """
         # Generate a salt and hash the password
         salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+        hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
 
         # Convert bytes to string for storage
-        return hashed.decode('utf-8')
+        return hashed.decode("utf-8")
 
     def _verify_password(self, password: str, password_hash: str) -> bool:
         """Verify a password against a hash
@@ -235,4 +233,4 @@ class UserServiceImpl(IUserService):
         Returns:
             True if the password matches the hash, False otherwise
         """
-        return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))

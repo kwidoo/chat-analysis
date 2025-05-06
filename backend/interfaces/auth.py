@@ -4,6 +4,7 @@ Auth Service Interfaces
 This module defines interfaces for authentication-related services,
 implementing the Interface Segregation Principle (I in SOLID).
 """
+
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, List, Any
 
@@ -94,7 +95,7 @@ class ITokenService(ABC):
         pass
 
     @abstractmethod
-    def validate_token(self, token: str, token_type: str = 'access') -> Optional[Dict[str, Any]]:
+    def validate_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
         """Validate a token and return its payload
 
         Args:
@@ -210,7 +211,7 @@ class IAuthService(ABC):
         pass
 
     @abstractmethod
-    def validate_token(self, token: str, token_type: str = 'access') -> Optional[Dict[str, Any]]:
+    def validate_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
         """Validate a token and return its payload"""
         pass
 

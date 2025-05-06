@@ -38,7 +38,9 @@ def migrate_index(params: Dict[str, Any]) -> bool:
         source_dim = params.get("source_dimension", 384)
         target_dim = params.get("target_dimension", 768)
 
-        logger.info(f"Starting migration from v1 to v2 index ({source_path} to {target_path})")
+        logger.info(
+            f"Starting migration from v1 to v2 index ({source_path} to {target_path})"
+        )
         logger.info(f"Source dimension: {source_dim}, Target dimension: {target_dim}")
 
         # Load source index
@@ -46,7 +48,9 @@ def migrate_index(params: Dict[str, Any]) -> bool:
             source_index = faiss.read_index(source_path)
             logger.info(f"Loaded source index with {source_index.ntotal} vectors")
         else:
-            logger.warning(f"Source index not found at {source_path}, creating empty target index")
+            logger.warning(
+                f"Source index not found at {source_path}, creating empty target index"
+            )
             target_index = faiss.IndexFlatL2(target_dim)
             faiss.write_index(target_index, target_path)
             return True
@@ -58,7 +62,9 @@ def migrate_index(params: Dict[str, Any]) -> bool:
         if source_index.ntotal > 0:
             # For this example, we're simulating the migration by padding the vectors
             # In a real scenario, you would re-encode the original data with the new model
-            logger.info(f"Transforming {source_index.ntotal} vectors from dimension {source_dim} to {target_dim}")
+            logger.info(
+                f"Transforming {source_index.ntotal} vectors from dimension {source_dim} to {target_dim}"
+            )
 
             # Extract vectors from source index (this is a simplified example)
             # In practice, you would need to:
@@ -80,15 +86,21 @@ def migrate_index(params: Dict[str, Any]) -> bool:
             try:
                 # This is a simplification - extracting vectors is not always possible
                 # and depends on the specific index type
-                vectors = np.array([source_index.reconstruct(i) for i in range(source_index.ntotal)])
+                vectors = np.array(
+                    [source_index.reconstruct(i) for i in range(source_index.ntotal)]
+                )
 
                 # Create padded vectors (again, this is just for demonstration)
-                padded_vectors = np.zeros((vectors.shape[0], target_dim), dtype=np.float32)
+                padded_vectors = np.zeros(
+                    (vectors.shape[0], target_dim), dtype=np.float32
+                )
                 padded_vectors[:, :source_dim] = vectors
 
                 # Add to target index
                 target_index.add(padded_vectors)
-                logger.info(f"Added {padded_vectors.shape[0]} transformed vectors to target index")
+                logger.info(
+                    f"Added {padded_vectors.shape[0]} transformed vectors to target index"
+                )
 
             except Exception as inner_e:
                 logger.error(f"Error during vector transformation: {inner_e}")

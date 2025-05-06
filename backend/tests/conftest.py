@@ -1,17 +1,17 @@
 import os
 import sys
-import pytest
-from flask import Flask
 import tempfile
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
 
-# Add the backend directory to the path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import pytest
 from app import create_app
 from db.session import get_db_session
+from flask import Flask
 from models.user import User
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+
+# Add the backend directory to the path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 class MockFAISService:
@@ -69,10 +69,10 @@ def app():
     # Use an in-memory SQLite database for testing
     db_fd, db_path = tempfile.mkstemp()
 
-    app = create_app('testing')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-    app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False
+    app = create_app("testing")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
 
     # Yield the app for tests to use
     with app.app_context():
@@ -86,12 +86,13 @@ def app():
 @pytest.fixture
 def db_session(app):
     """Create a new database session for testing"""
-    engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
+    engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
     session_factory = sessionmaker(bind=engine)
     session = scoped_session(session_factory)
 
     # Create tables
     from models.user import Base
+
     Base.metadata.create_all(engine)
 
     yield session
@@ -128,10 +129,7 @@ def mock_dask():
 def auth_headers(app, db_session):
     """Create a test user and return authentication headers"""
     # Create a test user
-    test_user = User(
-        username="testuser",
-        email="test@example.com"
-    )
+    test_user = User(username="testuser", email="test@example.com")
     test_user.set_password("password123")
     db_session.add(test_user)
     db_session.commit()
@@ -140,16 +138,13 @@ def auth_headers(app, db_session):
     auth_service = app.di_container.get_auth_service()
     token = auth_service.create_access_token(test_user.id)
 
-    return {'Authorization': f'Bearer {token}'}
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
 def test_user(db_session):
     """Create and return a test user"""
-    user = User(
-        username="testuser",
-        email="test@example.com"
-    )
+    user = User(username="testuser", email="test@example.com")
     user.set_password("password123")
     db_session.add(user)
     db_session.commit()

@@ -4,6 +4,7 @@ Queue Service Interfaces
 This module defines interfaces for queue-related services,
 implementing the Interface Segregation Principle (I in SOLID).
 """
+
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
 

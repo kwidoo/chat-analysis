@@ -1,16 +1,15 @@
 import os
 import sys
+import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 import pytest
-from concurrent.futures import ThreadPoolExecutor
-import threading
-import tempfile
+from services.index_service import FaissIndexService
 
 # Add the backend directory to the path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
-from services.index_service import FaissIndexService
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 
 @pytest.fixture
@@ -32,7 +31,7 @@ def populated_index(temp_index_path):
     index_service = FaissIndexService(temp_index_path, embedding_dimension=dimension)
 
     # Generate random embeddings
-    embeddings = np.random.rand(num_vectors, dimension).astype('float32')
+    embeddings = np.random.rand(num_vectors, dimension).astype("float32")
 
     # Add embeddings in batches to avoid memory issues
     batch_size = 10000
@@ -60,7 +59,7 @@ def test_index_creation_performance():
         index_service = FaissIndexService(index_path, embedding_dimension=dimension)
 
         # Generate random embeddings
-        embeddings = np.random.rand(num_vectors, dimension).astype('float32')
+        embeddings = np.random.rand(num_vectors, dimension).astype("float32")
 
         # Add all embeddings
         index_service.add_embeddings(embeddings)
@@ -80,7 +79,7 @@ def test_index_creation_performance():
 def test_search_performance(populated_index):
     """Test search performance with a single query"""
     # Generate a random query vector
-    query = np.random.rand(384).astype('float32')
+    query = np.random.rand(384).astype("float32")
 
     # Measure search time
     start_time = time.time()
@@ -109,7 +108,7 @@ def test_concurrent_search_performance(populated_index):
         times = []
         for i in range(num_queries_per_thread):
             # Generate a random query vector
-            query = np.random.rand(dimension).astype('float32')
+            query = np.random.rand(dimension).astype("float32")
 
             # Measure search time
             start_time = time.time()
@@ -150,7 +149,7 @@ def test_large_batch_search(populated_index):
     dimension = 384
 
     # Generate batch of query vectors
-    query_batch = np.random.rand(batch_size, dimension).astype('float32')
+    query_batch = np.random.rand(batch_size, dimension).astype("float32")
 
     # Measure batch search time
     start_time = time.time()

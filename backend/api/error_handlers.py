@@ -13,6 +13,7 @@ def register_error_handlers(app):
     Args:
         app: Flask application instance
     """
+
     @app.errorhandler(400)
     def bad_request(error):
         return jsonify({"error": "Bad request", "message": str(error)}), 400
@@ -28,7 +29,15 @@ def register_error_handlers(app):
     @app.errorhandler(500)
     def server_error(error):
         logger.error(f"500 error: {error}\n{traceback.format_exc()}")
-        return jsonify({"error": "Internal server error", "message": "An internal error occurred"}), 500
+        return (
+            jsonify(
+                {
+                    "error": "Internal server error",
+                    "message": "An internal error occurred",
+                }
+            ),
+            500,
+        )
 
     @app.errorhandler(Exception)
     def handle_exception(error):
@@ -40,7 +49,12 @@ def register_error_handlers(app):
         logger.error(f"Unhandled exception: {error}\n{traceback.format_exc()}")
 
         # Return a generic server error
-        return jsonify({
-            "error": "Internal server error",
-            "message": "An unexpected error occurred"
-        }), 500
+        return (
+            jsonify(
+                {
+                    "error": "Internal server error",
+                    "message": "An unexpected error occurred",
+                }
+            ),
+            500,
+        )

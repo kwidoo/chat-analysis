@@ -7,7 +7,12 @@ from services.interfaces import IndexServiceInterface
 
 
 class FaissIndexService(IndexServiceInterface):
-    def __init__(self, index_path: str, embedding_dimension: int = None, lock: threading.Lock = None):
+    def __init__(
+        self,
+        index_path: str,
+        embedding_dimension: int = None,
+        lock: threading.Lock = None,
+    ):
         """Initialize the FAISS index service
 
         Args:
@@ -24,7 +29,9 @@ class FaissIndexService(IndexServiceInterface):
                 self.index = faiss.read_index(index_path)
             else:
                 if embedding_dimension is None:
-                    raise ValueError("embedding_dimension must be provided when creating a new index")
+                    raise ValueError(
+                        "embedding_dimension must be provided when creating a new index"
+                    )
                 os.makedirs(os.path.dirname(index_path), exist_ok=True)
                 self.index = faiss.IndexFlatL2(embedding_dimension)
 
@@ -38,7 +45,7 @@ class FaissIndexService(IndexServiceInterface):
             return
 
         with self.lock:
-            self.index.add(np.array(embeddings, dtype='float32'))
+            self.index.add(np.array(embeddings, dtype="float32"))
             self.save_index()
 
     def search(self, query_embedding: np.ndarray, k: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -52,10 +59,7 @@ class FaissIndexService(IndexServiceInterface):
             Tuple of (distances, indices)
         """
         with self.lock:
-            return self.index.search(
-                np.array([query_embedding], dtype='float32'),
-                k
-            )
+            return self.index.search(np.array([query_embedding], dtype="float32"), k)
 
     def get_total(self) -> int:
         """Return the total number of embeddings in the index"""
@@ -88,7 +92,9 @@ class IndexManager:
         """
         return os.path.join(self.base_dir, f"indexes/{model_version}/index.index")
 
-    def get_index_service(self, model_version: str, embedding_dimension: int = None) -> IndexServiceInterface:
+    def get_index_service(
+        self, model_version: str, embedding_dimension: int = None
+    ) -> IndexServiceInterface:
         """Get or create an index service for a given model version
 
         Args:

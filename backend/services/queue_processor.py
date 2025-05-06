@@ -5,17 +5,21 @@ import queue
 import os
 from typing import Callable, Any
 
-from services.interfaces import QueueServiceInterface, EmbeddingServiceInterface, IndexServiceInterface
+from services.interfaces import (
+    QueueServiceInterface,
+    EmbeddingServiceInterface,
+    IndexServiceInterface,
+)
 
 
 class QueueProcessor:
     """Processor for the file processing queue"""
 
     def __init__(
-            self,
-            queue_service: QueueServiceInterface,
-            embedding_service: EmbeddingServiceInterface,
-            index_service: IndexServiceInterface
+        self,
+        queue_service: QueueServiceInterface,
+        embedding_service: EmbeddingServiceInterface,
+        index_service: IndexServiceInterface,
     ):
         """Initialize the queue processor
 
@@ -84,15 +88,15 @@ class QueueProcessor:
         # Read file contents
         content = file.read()
         if isinstance(content, bytes):
-            content = content.decode('utf-8')
+            content = content.decode("utf-8")
 
         # Parse JSON if it's a JSON file
-        data = json.loads(content) if file.filename.endswith('.json') else {"text": content}
+        data = json.loads(content) if file.filename.endswith(".json") else {"text": content}
 
         # Extract messages
         messages = []
         if "messages" in data:
-            messages = [msg.get('content', '') for msg in data["messages"] if 'content' in msg]
+            messages = [msg.get("content", "") for msg in data["messages"] if "content" in msg]
         elif "text" in data:
             messages = [data["text"]]
 

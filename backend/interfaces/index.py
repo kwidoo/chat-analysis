@@ -4,6 +4,7 @@ Index Service Interfaces
 This module defines interfaces for index-related services,
 implementing the Interface Segregation Principle (I in SOLID).
 """
+
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Tuple
 

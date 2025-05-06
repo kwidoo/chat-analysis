@@ -4,6 +4,7 @@ Unit tests for auth services demonstrating Liskov Substitution Principle
 These tests show how our interfaces can be substituted with mock implementations,
 adhering to the Liskov Substitution Principle (L in SOLID).
 """
+
 import pytest
 import datetime
 from typing import Dict, List, Any, Optional
@@ -26,9 +27,9 @@ class MockTokenService(ITokenService):
     def generate_access_token(self, user_id: str) -> str:
         token = f"mock-access-token-{user_id}-{datetime.datetime.utcnow().timestamp()}"
         payload = {
-            'sub': user_id,
-            'type': 'access',
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=self.token_expiry)
+            "sub": user_id,
+            "type": "access",
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=self.token_expiry),
         }
         self.token_payloads[token] = payload
         return token
@@ -36,15 +37,15 @@ class MockTokenService(ITokenService):
     def generate_refresh_token(self, user_id: str) -> str:
         token = f"mock-refresh-token-{user_id}-{datetime.datetime.utcnow().timestamp()}"
         payload = {
-            'sub': user_id,
-            'type': 'refresh',
-            'jti': f"mock-id-{datetime.datetime.utcnow().timestamp()}",
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=self.refresh_expiry)
+            "sub": user_id,
+            "type": "refresh",
+            "jti": f"mock-id-{datetime.datetime.utcnow().timestamp()}",
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=self.refresh_expiry),
         }
         self.token_payloads[token] = payload
         return token
 
-    def validate_token(self, token: str, token_type: str = 'access') -> Optional[Dict[str, Any]]:
+    def validate_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
         if token in self.revoked_tokens:
             return None
 
@@ -52,20 +53,20 @@ class MockTokenService(ITokenService):
         if not payload:
             return None
 
-        if payload.get('type') != token_type:
+        if payload.get("type") != token_type:
             return None
 
-        if payload.get('exp') < datetime.datetime.utcnow():
+        if payload.get("exp") < datetime.datetime.utcnow():
             return None
 
         return payload
 
     def refresh_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
-        payload = self.validate_token(refresh_token, 'refresh')
+        payload = self.validate_token(refresh_token, "refresh")
         if not payload:
             return None
 
-        user_id = payload['sub']
+        user_id = payload["sub"]
 
         # Revoke old token
         self.revoke_token(refresh_token)
@@ -75,9 +76,9 @@ class MockTokenService(ITokenService):
         refresh_token = self.generate_refresh_token(user_id)
 
         return {
-            'access_token': access_token,
-            'refresh_token': refresh_token,
-            'expires_in': self.token_expiry
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": self.token_expiry,
         }
 
     def revoke_token(self, refresh_token: str) -> bool:
@@ -89,8 +90,7 @@ class MockTokenService(ITokenService):
     def clean_expired_tokens(self) -> None:
         now = datetime.datetime.utcnow()
         expired_tokens = [
-            token for token, payload in self.token_payloads.items()
-            if payload.get('exp') < now
+            token for token, payload in self.token_payloads.items() if payload.get("exp") < now
         ]
         for token in expired_tokens:
             del self.token_payloads[token]
@@ -119,7 +119,15 @@ class MockMFAService(IMFAService):
 class MockUser:
     """Mock user object for testing"""
 
-    def __init__(self, id, username, password_hash, roles=None, mfa_enabled=False, mfa_secret=None):
+    def __init__(
+        self,
+        id,
+        username,
+        password_hash,
+        roles=None,
+        mfa_enabled=False,
+        mfa_secret=None,
+    ):
         self.id = id
         self.username = username
         self.password_hash = password_hash
@@ -170,10 +178,7 @@ class MockUserService(IUserService):
             # Generate an MFA token
             mfa_token = self.mfa_service.generate_mfa_token(user.id)
 
-            return {
-                "requires_mfa": True,
-                "mfa_token": mfa_token
-            }
+            return {"requires_mfa": True, "mfa_token": mfa_token}
 
         # No MFA, generate tokens
         access_token = self.token_service.generate_access_token(user.id)
@@ -182,7 +187,7 @@ class MockUserService(IUserService):
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": self.token_service.token_expiry
+            "expires_in": self.token_service.token_expiry,
         }
 
     def get_user_by_id(self, user_id: str) -> Any:
@@ -226,7 +231,7 @@ class MockUserService(IUserService):
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": self.token_service.token_expiry
+            "expires_in": self.token_service.token_expiry,
         }
 
 

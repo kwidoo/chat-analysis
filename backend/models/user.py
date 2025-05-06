@@ -1,25 +1,26 @@
 import datetime
 import uuid
-from typing import Dict, List, Optional
+from typing import List
 
-from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Table
+from db.session import db
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import relationship
 
-from db.session import db
-
 # Many-to-many relationship between users and roles
 user_roles = Table(
-    'user_roles',
+    "user_roles",
     db.Model.metadata,
-    Column('user_id', String(36), ForeignKey('users.id')),
-    Column('role_id', String(36), ForeignKey('roles.id'))
+    Column("user_id", String(36), ForeignKey("users.id")),
+    Column("role_id", String(36), ForeignKey("roles.id")),
 )
+
 
 class Role(db.Model):
     """Role model for role-based access control."""
-    __tablename__ = 'roles'
+
+    __tablename__ = "roles"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(50), unique=True, nullable=False)
@@ -31,10 +32,11 @@ class Role(db.Model):
 
 class RefreshToken(db.Model):
     """Model for storing refresh tokens."""
-    __tablename__ = 'refresh_tokens'
+
+    __tablename__ = "refresh_tokens"
 
     id = Column(String(36), primary_key=True)  # JWT ID (jti)
-    user_id = Column(String(36), ForeignKey('users.id'), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     expires_at = Column(DateTime, nullable=False)
     revoked = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -48,7 +50,8 @@ class RefreshToken(db.Model):
 
 class User(db.Model):
     """User model for authentication and authorization."""
-    __tablename__ = 'users'
+
+    __tablename__ = "users"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=False)
@@ -63,7 +66,9 @@ class User(db.Model):
 
     # Relationships
     roles = relationship("Role", secondary=user_roles, backref="users")
-    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    refresh_tokens = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
 
     # JSON field for storing additional user metadata
     # Using SQLAlchemy-JSON for cross-database compatibility
@@ -79,4 +84,4 @@ class User(db.Model):
 
     def has_role(self, role_name: str) -> bool:
         """Check if user has a specific role."""
-        return role_name in self.role_names or 'admin' in self.role_names
+        return role_name in self.role_names or "admin" in self.role_names

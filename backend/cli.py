@@ -1,10 +1,11 @@
-import click
-from flask import Flask
-from flask.cli import FlaskGroup, with_appcontext
-import os
-import alembic.config
 import sys
+
+import alembic.config
+import click
 from db.session import db
+from flask import Flask
+from flask.cli import with_appcontext
+
 
 def register_cli_commands(app: Flask):
     """Register CLI commands with Flask application."""
@@ -26,7 +27,7 @@ def register_cli_commands(app: Flask):
             sys.exit(1)
 
     @db_commands.command("upgrade", help="Upgrade database to the latest migration")
-    @click.option('--revision', default='head', help='Revision to upgrade to (default: head)')
+    @click.option("--revision", default="head", help="Revision to upgrade to (default: head)")
     @with_appcontext
     def upgrade_db(revision):
         """Upgrade the database to the latest migration."""
@@ -35,7 +36,7 @@ def register_cli_commands(app: Flask):
             config = alembic.config.Config("alembic.ini")
 
             # Run the migration
-            args = ['upgrade', revision]
+            args = ["upgrade", revision]
             alembic.config.main(argv=args, config=config)
 
             click.echo(f"Successfully upgraded database to revision: {revision}")
@@ -44,13 +45,13 @@ def register_cli_commands(app: Flask):
             sys.exit(1)
 
     @db_commands.command("downgrade", help="Downgrade database to a previous migration")
-    @click.option('--revision', required=True, help='Revision to downgrade to')
+    @click.option("--revision", required=True, help="Revision to downgrade to")
     @with_appcontext
     def downgrade_db(revision):
         """Downgrade the database to a previous migration."""
         try:
             config = alembic.config.Config("alembic.ini")
-            args = ['downgrade', revision]
+            args = ["downgrade", revision]
             alembic.config.main(argv=args, config=config)
             click.echo(f"Successfully downgraded database to revision: {revision}")
         except Exception as e:
@@ -58,13 +59,13 @@ def register_cli_commands(app: Flask):
             sys.exit(1)
 
     @db_commands.command("migrate", help="Create a new migration")
-    @click.option('--message', '-m', required=True, help='Migration message')
+    @click.option("--message", "-m", required=True, help="Migration message")
     @with_appcontext
     def create_migration(message):
         """Create a new migration based on current model changes."""
         try:
             config = alembic.config.Config("alembic.ini")
-            args = ['revision', '--autogenerate', '-m', message]
+            args = ["revision", "--autogenerate", "-m", message]
             alembic.config.main(argv=args, config=config)
             click.echo(f"Migration created with message: {message}")
         except Exception as e:
@@ -93,8 +94,8 @@ def register_cli_commands(app: Flask):
             sys.exit(1)
 
     @db_commands.command("create-admin", help="Create admin user")
-    @click.option('--username', default=None, help='Admin username')
-    @click.option('--password', default=None, help='Admin password')
+    @click.option("--username", default=None, help="Admin username")
+    @click.option("--password", default=None, help="Admin password")
     @with_appcontext
     def create_admin(username, password):
         """Create admin user in the database."""
@@ -103,14 +104,14 @@ def register_cli_commands(app: Flask):
         try:
             with app.app_context():
                 # Use provided credentials or default from config
-                admin_username = username or app.config.get('ADMIN_USERNAME', 'admin')
-                admin_password = password or app.config.get('ADMIN_PASSWORD', 'admin')
+                admin_username = username or app.config.get("ADMIN_USERNAME", "admin")
+                admin_password = password or app.config.get("ADMIN_PASSWORD", "admin")
 
                 try:
                     app.auth_service.create_user(
                         username=admin_username,
                         password=admin_password,
-                        roles=["admin"]
+                        roles=["admin"],
                     )
                     click.echo(f"Admin user '{admin_username}' created successfully.")
                 except ValueError as e:

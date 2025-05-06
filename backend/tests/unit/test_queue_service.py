@@ -1,12 +1,14 @@
-import pytest
 import os
-import tempfile
 import shutil
+import tempfile
+
+import pytest
 from services.queue_service import FileProcessingQueueService
 
 
 class MockFile:
     """Mock file object for testing"""
+
     def __init__(self, filename):
         self.filename = filename
 
@@ -22,7 +24,7 @@ class TestQueueService:
     @pytest.fixture
     def queue_file_path(self, temp_dir):
         """Fixture for a temporary queue file path"""
-        return os.path.join(temp_dir, 'test_queue.pkl')
+        return os.path.join(temp_dir, "test_queue.pkl")
 
     def test_empty_queue_init(self, queue_file_path):
         """Test initializing an empty queue"""
@@ -98,7 +100,7 @@ class TestQueueService:
         service.add_task(file, task_id)
 
         # Get the task
-        task = service.get_task(block=False)
+        service.get_task(block=False)  # Changed: task variable was unused.
 
         # Mark as done
         service.task_done()

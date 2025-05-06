@@ -4,27 +4,30 @@ Message Broker Implementation
 This module provides an implementation of the IMessageBroker interface
 using RabbitMQ for message queuing, supporting the Dependency Inversion Principle.
 """
-import logging
-import json
-import pika
-from typing import Dict, Any, List, Optional, Callable
-from pika.adapters.blocking_connection import BlockingChannel
 
+import json
+import logging
+from typing import Any, Callable, Dict, List, Optional
+
+import pika
 from interfaces.message_broker import IMessageBroker
+from pika.adapters.blocking_connection import BlockingChannel
 
 
 class RabbitMQConnectionPool(IMessageBroker):
     """RabbitMQ implementation of the message broker interface using a connection pool"""
 
-    def __init__(self,
-                 host: str = 'localhost',
-                 port: int = 5672,
-                 user: str = 'guest',
-                 password: str = 'guest',
-                 virtual_host: str = '/',
-                 connection_attempts: int = 3,
-                 retry_delay: int = 5,
-                 max_connections: int = 10):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 5672,
+        user: str = "guest",
+        password: str = "guest",
+        virtual_host: str = "/",
+        connection_attempts: int = 3,
+        retry_delay: int = 5,
+        max_connections: int = 10,
+    ):
         """Initialize the RabbitMQ connection pool
 
         Args:
@@ -56,7 +59,7 @@ class RabbitMQConnectionPool(IMessageBroker):
             virtual_host=self.virtual_host,
             credentials=pika.PlainCredentials(self.user, self.password),
             connection_attempts=self.connection_attempts,
-            retry_delay=self.retry_delay
+            retry_delay=self.retry_delay,
         )
 
     def get_connection(self) -> Any:
@@ -80,7 +83,7 @@ class RabbitMQConnectionPool(IMessageBroker):
                 try:
                     if connection.is_closed:
                         connection.close()
-                except:
+                except Exception:
                     pass
             except Exception as e:
                 self.logger.warning(f"Error reusing connection from pool: {e}")
@@ -108,7 +111,7 @@ class RabbitMQConnectionPool(IMessageBroker):
             try:
                 if not connection.is_closed:
                     connection.close()
-            except:
+            except Exception:
                 pass
 
     def close_all(self) -> None:
@@ -141,8 +144,13 @@ class RabbitMQConnectionPool(IMessageBroker):
             self.logger.warning(f"Health check failed: {e}")
             return False
 
-    def publish_message(self, exchange: str, routing_key: str, message: Dict[str, Any],
-                       properties: Optional[Dict[str, Any]] = None) -> bool:
+    def publish_message(
+        self,
+        exchange: str,
+        routing_key: str,
+        message: Dict[str, Any],
+        properties: Optional[Dict[str, Any]] = None,
+    ) -> bool:
         """Publish a message to RabbitMQ
 
         Args:
@@ -176,7 +184,7 @@ class RabbitMQConnectionPool(IMessageBroker):
                 exchange=exchange,
                 routing_key=routing_key,
                 body=message_body,
-                properties=props
+                properties=props,
             )
 
             return True
@@ -187,8 +195,13 @@ class RabbitMQConnectionPool(IMessageBroker):
             if connection:
                 connection.close()
 
-    def declare_queue(self, queue_name: str, durable: bool = True,
-                     exclusive: bool = False, auto_delete: bool = False) -> Any:
+    def declare_queue(
+        self,
+        queue_name: str,
+        durable: bool = True,
+        exclusive: bool = False,
+        auto_delete: bool = False,
+    ) -> Any:
         """Declare a queue in RabbitMQ
 
         Args:
@@ -213,7 +226,7 @@ class RabbitMQConnectionPool(IMessageBroker):
                 queue=queue_name,
                 durable=durable,
                 exclusive=exclusive,
-                auto_delete=auto_delete
+                auto_delete=auto_delete,
             )
 
             return result
@@ -246,9 +259,7 @@ class RabbitMQConnectionPool(IMessageBroker):
 
             # Start consuming
             result = channel.basic_consume(
-                queue=queue_name,
-                on_message_callback=callback,
-                auto_ack=False
+                queue=queue_name, on_message_callback=callback, auto_ack=False
             )
 
             # Start consuming (this is a blocking call)
@@ -294,7 +305,7 @@ class RabbitMQConnection:
             try:
                 if channel.is_open:
                     channel.close()
-            except:
+            except Exception:
                 pass
 
         self._channels = []

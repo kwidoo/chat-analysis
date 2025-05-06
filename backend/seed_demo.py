@@ -1,6 +1,7 @@
 from app import app
 import logging
 
+
 def seed():
     """Create demo users for testing purposes."""
     logger = logging.getLogger(__name__)
@@ -9,9 +10,7 @@ def seed():
         # Create a regular user
         try:
             app.auth_service.create_user(
-                username="demo@example.com",
-                password="demo123",
-                roles=["user"]
+                username="demo@example.com", password="demo123", roles=["user"]
             )
             logger.info("Created demo user: demo@example.com")
         except ValueError as e:
@@ -20,9 +19,7 @@ def seed():
         # Create an admin user
         try:
             app.auth_service.create_user(
-                username="admin@example.com",
-                password="admin123",
-                roles=["admin"]
+                username="admin@example.com", password="admin123", roles=["admin"]
             )
             logger.info("Created admin user: admin@example.com")
         except ValueError as e:
@@ -33,6 +30,7 @@ def seed():
     except Exception as e:
         logger.error(f"Error seeding users: {e}")
         print(f"Failed to seed users: {e}")
+
 
 if __name__ == "__main__":
     seed()

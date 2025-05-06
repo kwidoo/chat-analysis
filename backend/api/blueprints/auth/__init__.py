@@ -1,7 +1,6 @@
 from flask import Blueprint
 
-# Create auth blueprint
-auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+from . import routes  # Import routes to register them with the blueprint; # noqa: F401
 
-# Import routes to register them with the blueprint
-from . import routes
+# Create auth blueprint
+auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")

@@ -21,7 +21,7 @@ class FileProcessingQueueService(QueueServiceInterface):
         # Try to load the existing queue if the file exists
         if os.path.exists(queue_file_path):
             try:
-                with open(queue_file_path, 'rb') as f:
+                with open(queue_file_path, "rb") as f:
                     pending_items = pickle.load(f)
                     for item in pending_items:
                         self.queue.put(item)
@@ -50,7 +50,7 @@ class FileProcessingQueueService(QueueServiceInterface):
             with self.lock:
                 pending_items = list(self.queue.queue)
                 os.makedirs(os.path.dirname(self.queue_file_path), exist_ok=True)
-                with open(self.queue_file_path, 'wb') as f:
+                with open(self.queue_file_path, "wb") as f:
                     pickle.dump(pending_items, f)
         except Exception as e:
             print(f"Error saving queue: {e}")

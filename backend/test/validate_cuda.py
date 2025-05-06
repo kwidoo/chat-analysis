@@ -7,16 +7,18 @@ and available to the Python environment.
 """
 import sys
 import subprocess
+
 try:
     # Try to call nvidia-smi
     print("Running nvidia-smi:")
-    nvidia_smi = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE, text=True)
+    nvidia_smi = subprocess.run(["nvidia-smi"], stdout=subprocess.PIPE, text=True)
     print(nvidia_smi.stdout)
 except Exception as e:
     print(f"Error running nvidia-smi: {e}")
 
 try:
     import torch
+
     print("\n--- PyTorch CUDA Information ---")
     print(f"PyTorch version: {torch.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
@@ -41,6 +43,7 @@ except ImportError:
 
 try:
     from transformers import AutoModel
+
     print("\n--- Hugging Face Transformers Test ---")
     print("Loading a small model to test GPU capability...")
     model = AutoModel.from_pretrained("distilbert-base-uncased")

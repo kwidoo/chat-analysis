@@ -1,9 +1,8 @@
 from functools import wraps
 from typing import Callable, Dict, List, Optional, Set, Union
 
-from flask import Flask, Request, g, request, jsonify, current_app
 import jwt
-
+from flask import Flask, Request, current_app, g, jsonify, request
 from services.auth_service import AuthService
 
 
@@ -31,6 +30,7 @@ class PermissionMiddleware:
         Args:
             roles: List of roles required to access the endpoint
         """
+
         def decorator(func: Callable):
             endpoint = f"{request.endpoint}"
             self.endpoints[endpoint] = set(roles)
@@ -38,13 +38,15 @@ class PermissionMiddleware:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
+
             return wrapper
+
         return decorator
 
     def _check_permissions(self):
         """Check if the current request has the required permissions."""
         # Skip auth for OPTIONS requests (CORS preflight)
-        if request.method == 'OPTIONS':
+        if request.method == "OPTIONS":
             return None
 
         # Skip auth for endpoints that don't require it
@@ -69,14 +71,14 @@ class PermissionMiddleware:
                 return jsonify({"error": "Invalid token"}), 401
 
             # Check if token is an access token (not a refresh token)
-            if payload.type != 'access':
+            if payload.type != "access":
                 return jsonify({"error": "Invalid token type"}), 401
 
             # Check if user has the required role
             user_roles = set(payload.roles)
 
             # 'admin' role has access to everything
-            if 'admin' in user_roles:
+            if "admin" in user_roles:
                 g.user_id = payload.sub
                 g.user_roles = payload.roles
                 return None
@@ -101,22 +103,24 @@ def requires_auth(roles: List[str] = None):
     without needing to access the PermissionMiddleware instance.
 
     Args:
-        roles: List of roles required to access the endpoint (default: None, which means any authenticated user)
+        roles: List of roles required to access the
+        endpoint (default: None, which means any authenticated user)
     """
+
     def decorator(func: Callable):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # Skip auth for OPTIONS requests (CORS preflight)
-            if request.method == 'OPTIONS':
+            if request.method == "OPTIONS":
                 return func(*args, **kwargs)
 
             # Get token from header
-            auth_header = request.headers.get('Authorization')
+            auth_header = request.headers.get("Authorization")
             if not auth_header:
                 return jsonify({"error": "Authorization required"}), 401
 
             parts = auth_header.split()
-            if len(parts) != 2 or parts[0].lower() != 'bearer':
+            if len(parts) != 2 or parts[0].lower() != "bearer":
                 return jsonify({"error": "Invalid authorization format"}), 401
 
             token = parts[1]
@@ -130,7 +134,7 @@ def requires_auth(roles: List[str] = None):
                     return jsonify({"error": "Invalid token"}), 401
 
                 # Check if token is an access token (not a refresh token)
-                if payload.type != 'access':
+                if payload.type != "access":
                     return jsonify({"error": "Invalid token type"}), 401
 
                 # Store user info in g for the request
@@ -143,7 +147,7 @@ def requires_auth(roles: List[str] = None):
                     required_roles = set(roles)
 
                     # 'admin' role has access to everything
-                    if 'admin' in user_roles:
+                    if "admin" in user_roles:
                         return func(*args, **kwargs)
 
                     # Check if user has any of the required roles
@@ -156,4 +160,5 @@ def requires_auth(roles: List[str] = None):
                 return jsonify({"error": "Invalid token"}), 401
 
         return wrapper
+
     return decorator

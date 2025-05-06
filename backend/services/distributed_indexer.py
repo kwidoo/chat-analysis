@@ -1,19 +1,16 @@
-import os
-import time
 import logging
-import numpy as np
-import faiss
-import threading
-import json
+import os
 import tempfile
+import threading
+import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Union, Callable
-from datetime import datetime
-import dask
+from typing import Any, Callable, Dict, Optional, Tuple, Union
+
 import dask.array as da
-from dask.distributed import Client, get_client, wait
+import faiss
 import fasteners
-from concurrent.futures import ThreadPoolExecutor
+import numpy as np
+from dask.distributed import Client, get_client, wait
 
 logger = logging.getLogger(__name__)
 
@@ -38,24 +35,24 @@ class DaskDistributedIndexer:
                 - INDEX_TYPE: Type of index to build (default: 'flat')
                 - IVF_NLIST: Number of centroids for IVF indices (default: 100)
         """
-        self.faiss_dir = Path(config.get('FAISS_DIR', './faiss'))
-        self.active_model = config.get('ACTIVE_MODEL', 'v1')
-        self.dask_scheduler = config.get('DASK_SCHEDULER_ADDRESS', 'tcp://dask-scheduler:8786')
+        self.faiss_dir = Path(config.get("FAISS_DIR", "./faiss"))
+        self.active_model = config.get("ACTIVE_MODEL", "v1")
+        self.dask_scheduler = config.get("DASK_SCHEDULER_ADDRESS", "tcp://dask-scheduler:8786")
 
         # Indexing settings
-        self.chunk_size = config.get('CHUNK_SIZE', 10000)
-        self.max_workers = config.get('MAX_WORKERS', 4)
-        self.index_type = config.get('INDEX_TYPE', 'flat').lower()
-        self.ivf_nlist = config.get('IVF_NLIST', 100)
+        self.chunk_size = config.get("CHUNK_SIZE", 10000)
+        self.max_workers = config.get("MAX_WORKERS", 4)
+        self.index_type = config.get("INDEX_TYPE", "flat").lower()
+        self.ivf_nlist = config.get("IVF_NLIST", 100)
 
         # Paths
-        self.index_dir = self.faiss_dir / 'indexes' / self.active_model
-        self.index_path = self.index_dir / 'index.index'
+        self.index_dir = self.faiss_dir / "indexes" / self.active_model
+        self.index_path = self.index_dir / "index.index"
         self.index_dir.mkdir(parents=True, exist_ok=True)
 
         # Lock for thread safety
         self._lock = threading.Lock()
-        self._file_lock = fasteners.InterProcessLock(str(self.faiss_dir / 'index.lock'))
+        self._file_lock = fasteners.InterProcessLock(str(self.faiss_dir / "index.lock"))
 
         # Dask client
         self._client = None
@@ -75,12 +72,13 @@ class DaskDistributedIndexer:
                 # Create new client
                 logger.info(f"Connecting to Dask scheduler at {self.dask_scheduler}")
                 self._client = Client(self.dask_scheduler)
-                logger.info(f"Connected to Dask cluster with {len(self._client.scheduler_info()['workers'])} workers")
+                logger.info(f"Dask {len(self._client.scheduler_info()['workers'])} workers")
 
         return self._client
 
-    def build_index(self, embeddings: Union[np.ndarray, da.Array],
-                    dimension: Optional[int] = None) -> str:
+    def build_index(
+        self, embeddings: Union[np.ndarray, da.Array], dimension: Optional[int] = None
+    ) -> str:
         """Build a FAISS index from embeddings using distributed processing
 
         Args:
@@ -111,21 +109,23 @@ class DaskDistributedIndexer:
             dask_embeddings = embeddings
 
         # Get Dask client
-        client = self.get_client()
+        self.get_client()  # Changed: client variable was unused.
 
         # Choose index building strategy based on index type and size
-        if self.index_type == 'flat':
+        if self.index_type == "flat":
             index_path = self._build_flat_index(dask_embeddings, dimension)
-        elif self.index_type == 'ivf':
+        elif self.index_type == "ivf":
             index_path = self._build_ivf_index(dask_embeddings, dimension)
-        elif self.index_type == 'hnsw':
+        elif self.index_type == "hnsw":
             index_path = self._build_hnsw_index(dask_embeddings, dimension)
         else:
             raise ValueError(f"Unsupported index type: {self.index_type}")
 
         elapsed_time = time.time() - start_time
-        logger.info(f"Built index with {total_vectors} vectors in {elapsed_time:.2f}s "
-                   f"({total_vectors / elapsed_time:.2f} vectors/second)")
+        logger.info(
+            f"Built index with {total_vectors} vectors in {elapsed_time:.2f}s "
+            f"({total_vectors / elapsed_time:.2f} vectors/second)"
+        )
 
         return index_path
 
@@ -171,7 +171,7 @@ class DaskDistributedIndexer:
 
         # Train the index
         logger.info("Training IVF index...")
-        index.train(train_vectors.astype('float32'))
+        index.train(train_vectors.astype("float32"))
 
         # Now build the index with trained centroids
         return self._build_chunked_index(embeddings, index)
@@ -196,7 +196,6 @@ class DaskDistributedIndexer:
 
         # HNSW doesn't need training, but adding vectors is not thread-safe
         # So we use a slightly different approach
-        temp_indexes = []
         futures = []
         client = self.get_client()
 
@@ -209,7 +208,9 @@ class DaskDistributedIndexer:
         # Process chunks in parallel
         for i, chunk in enumerate(chunks):
             # Each worker builds a temporary index
-            future = client.submit(self._build_partial_hnsw, chunk, dimension, M, ef_construction, i)
+            future = client.submit(
+                self._build_partial_hnsw, chunk, dimension, M, ef_construction, i
+            )
             futures.append(future)
 
         # Wait for all tasks to complete
@@ -237,10 +238,10 @@ class DaskDistributedIndexer:
         index.hnsw.efConstruction = ef_construction
 
         # Add vectors
-        index.add(vectors.astype('float32'))
+        index.add(vectors.astype("float32"))
 
         # Save to temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f'_chunk_{i}.index') as tmp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_chunk_{i}.index") as tmp:
             temp_path = tmp.name
 
         faiss.write_index(index, temp_path)
@@ -279,15 +280,12 @@ class DaskDistributedIndexer:
         Returns:
             str: Path to the built index
         """
+        # Get the client for parallel processing
         client = self.get_client()
-
-        # Calculate chunks based on available workers and memory constraints
-        n_workers = len(client.scheduler_info()['workers'])
-        effective_workers = min(n_workers, self.max_workers)
 
         # Process chunks in parallel using Dask
         # Create temporary directory for partial indices
-        temp_dir = tempfile.mkdtemp(prefix='faiss_temp_')
+        temp_dir = tempfile.mkdtemp(prefix="faiss_temp_")
         futures = []
 
         # Split data into chunks and process
@@ -296,7 +294,7 @@ class DaskDistributedIndexer:
             chunk = embeddings[i:chunk_end]
 
             # Process each chunk in a worker
-            chunk_path = os.path.join(temp_dir, f'chunk_{i}.npy')
+            chunk_path = os.path.join(temp_dir, f"chunk_{i}.npy")
             future = client.submit(self._process_chunk, chunk, chunk_path)
             futures.append(future)
 
@@ -314,7 +312,7 @@ class DaskDistributedIndexer:
                     chunk_data = np.load(chunk_path)
 
                     # Add to index
-                    index.add(chunk_data.astype('float32'))
+                    index.add(chunk_data.astype("float32"))
 
                     # Remove temporary file
                     os.remove(chunk_path)
@@ -350,8 +348,9 @@ class DaskDistributedIndexer:
 
         return output_path
 
-    def index_from_batches(self, data_generator: Callable[[], Tuple[np.ndarray, int]],
-                           dimension: int) -> str:
+    def index_from_batches(
+        self, data_generator: Callable[[], Tuple[np.ndarray, int]], dimension: int
+    ) -> str:
         """Build an index from batches of data using a generator
 
         Args:
@@ -364,9 +363,9 @@ class DaskDistributedIndexer:
         start_time = time.time()
 
         # Create appropriate index based on type
-        if self.index_type == 'flat':
+        if self.index_type == "flat":
             index = faiss.IndexFlatL2(dimension)
-        elif self.index_type == 'ivf':
+        elif self.index_type == "ivf":
             quantizer = faiss.IndexFlatL2(dimension)
             index = faiss.IndexIVFFlat(quantizer, dimension, self.ivf_nlist)
             # For IVF, we need training data
@@ -374,8 +373,8 @@ class DaskDistributedIndexer:
             first_batch, _ = next(data_generator())
             if len(first_batch) > 0:
                 logger.info(f"Training IVF index with {len(first_batch)} vectors")
-                index.train(first_batch.astype('float32'))
-        elif self.index_type == 'hnsw':
+                index.train(first_batch.astype("float32"))
+        elif self.index_type == "hnsw":
             index = faiss.IndexHNSWFlat(dimension, 16)  # M=16 connections per node
         else:
             raise ValueError(f"Unsupported index type: {self.index_type}")
@@ -388,7 +387,7 @@ class DaskDistributedIndexer:
 
             # Add batch to index
             with self._file_lock:
-                index.add(batch.astype('float32'))
+                index.add(batch.astype("float32"))
 
             total_vectors += batch_size
             logger.info(f"Indexed batch of {batch_size} vectors, total: {total_vectors}")
@@ -404,13 +403,16 @@ class DaskDistributedIndexer:
             faiss.write_index(index, str(self.index_path))
 
         elapsed_time = time.time() - start_time
-        logger.info(f"Built index with {total_vectors} vectors in {elapsed_time:.2f}s "
-                   f"({total_vectors / elapsed_time:.2f} vectors/second)")
+        logger.info(
+            f"Built index with {total_vectors} vectors in {elapsed_time:.2f}s "
+            f"({total_vectors / elapsed_time:.2f} vectors/second)"
+        )
 
         return str(self.index_path)
 
-    def optimize_index_for_search(self, source_path: Optional[str] = None,
-                                 target_path: Optional[str] = None) -> str:
+    def optimize_index_for_search(
+        self, source_path: Optional[str] = None, target_path: Optional[str] = None
+    ) -> str:
         """Optimize an existing index for faster search performance
 
         Args:
@@ -444,9 +446,9 @@ class DaskDistributedIndexer:
                 index.nprobe = default_nprobe
                 optimized = index
 
-            elif isinstance(index, faiss.IndexHNSW) or hasattr(index, 'hnsw'):
+            elif isinstance(index, faiss.IndexHNSW) or hasattr(index, "hnsw"):
                 # For HNSW indices, set efSearch parameter
-                if hasattr(index, 'hnsw'):
+                if hasattr(index, "hnsw"):
                     index.hnsw.efSearch = 64  # Increase for better recall
                 optimized = index
 

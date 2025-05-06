@@ -1,11 +1,11 @@
-import pika
 import json
-import time
-import threading
 import logging
-from typing import Dict, List, Any, Callable, Optional
+import threading
+import time
 from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, List, Optional
 
+import pika
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,12 @@ class MessageBrokerInterface(ABC):
         pass
 
     @abstractmethod
-    def consume(self, queue_name: str, callback: Callable[[Dict[str, Any]], None], prefetch: int = 1) -> None:
+    def consume(
+        self,
+        queue_name: str,
+        callback: Callable[[Dict[str, Any]], None],
+        prefetch: int = 1,
+    ) -> None:
         """Start consuming messages from a queue
 
         Args:
@@ -63,10 +68,16 @@ class MessageBrokerInterface(ABC):
 class RabbitMQBroker(MessageBrokerInterface):
     """Implementation of MessageBrokerInterface using RabbitMQ"""
 
-    def __init__(self, host: str = 'localhost', port: int = 5672,
-                 user: str = 'guest', password: str = 'guest',
-                 virtual_host: str = '/', connection_attempts: int = 5,
-                 retry_delay: int = 5):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 5672,
+        user: str = "guest",
+        password: str = "guest",
+        virtual_host: str = "/",
+        connection_attempts: int = 5,
+        retry_delay: int = 5,
+    ):
         """Initialize RabbitMQ connection parameters (DOES NOT connect immediately)
 
         Args:
@@ -113,7 +124,7 @@ class RabbitMQBroker(MessageBrokerInterface):
                 virtual_host=self.virtual_host,
                 credentials=credentials,
                 connection_attempts=self.connection_attempts,
-                retry_delay=self.retry_delay
+                retry_delay=self.retry_delay,
             )
 
             try:
@@ -147,7 +158,7 @@ class RabbitMQBroker(MessageBrokerInterface):
         if self._connection and self._connection.is_open:
             try:
                 self._connection.close()
-            except:
+            except Exception:
                 pass
         self._connection = None
         self._channel = None
@@ -169,18 +180,23 @@ class RabbitMQBroker(MessageBrokerInterface):
         # Set message properties
         properties = pika.BasicProperties(
             delivery_mode=2 if persistent else 1,  # Make message persistent
-            content_type='application/json'
+            content_type="application/json",
         )
 
         # Publish message
         self._channel.basic_publish(
-            exchange='',
+            exchange="",
             routing_key=queue_name,
             body=json.dumps(message),
-            properties=properties
+            properties=properties,
         )
 
-    def consume(self, queue_name: str, callback: Callable[[Dict[str, Any]], None], prefetch: int = 1) -> None:
+    def consume(
+        self,
+        queue_name: str,
+        callback: Callable[[Dict[str, Any]], None],
+        prefetch: int = 1,
+    ) -> None:
         """Start consuming messages from a queue
 
         Args:
@@ -210,9 +226,7 @@ class RabbitMQBroker(MessageBrokerInterface):
 
         # Start consuming
         self._channel.basic_consume(
-            queue=queue_name,
-            on_message_callback=on_message_callback,
-            auto_ack=False
+            queue=queue_name, on_message_callback=on_message_callback, auto_ack=False
         )
 
         self._consuming = True
@@ -230,7 +244,7 @@ class RabbitMQBroker(MessageBrokerInterface):
         if self._consuming:
             try:
                 self._channel.stop_consuming()
-            except:
+            except Exception:
                 pass
             self._consuming = False
 
@@ -251,10 +265,12 @@ class RabbitMQBroker(MessageBrokerInterface):
         Returns:
             True if connected, False otherwise
         """
-        return (self._connection is not None and
-                self._connection.is_open and
-                self._channel is not None and
-                self._channel.is_open)
+        return (
+            self._connection is not None
+            and self._connection.is_open
+            and self._channel is not None
+            and self._channel.is_open
+        )
 
 
 class RabbitMQConnectionPool:
@@ -314,5 +330,5 @@ class RabbitMQConnectionPool:
             return {
                 "total_connections": total,
                 "active_connections": active,
-                "connection_pool_utilization": active / max(1, self.max_connections)
+                "connection_pool_utilization": active / max(1, self.max_connections),
             }

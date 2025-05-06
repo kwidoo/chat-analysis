@@ -4,13 +4,14 @@ Application Factory
 This module provides a factory function for creating the Flask application,
 implementing the Factory Method pattern for better control over application initialization.
 """
-import os
+
 import logging
+import os
+
+import config
+from core.di_container import DIContainer
 from flask import Flask
 from flask_cors import CORS
-
-from core.di_container import DIContainer
-import config
 
 
 def create_app(config_name=None) -> Flask:
@@ -25,7 +26,7 @@ def create_app(config_name=None) -> Flask:
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     # Create the Flask application
@@ -33,7 +34,7 @@ def create_app(config_name=None) -> Flask:
 
     # Load configuration
     if not config_name:
-        config_name = os.environ.get('FLASK_ENV', 'development')
+        config_name = os.environ.get("FLASK_ENV", "development")
     app.config.from_object(getattr(config, f"{config_name.capitalize()}Config"))
 
     # Configure the application
@@ -52,10 +53,12 @@ def _configure_app(app: Flask) -> None:
     CORS(app, supports_credentials=True)
 
     # Configure session
-    app.config['SESSION_TYPE'] = 'filesystem'
-    app.config['SESSION_PERMANENT'] = False
-    app.config['SESSION_USE_SIGNER'] = True
-    app.config['SESSION_FILE_DIR'] = os.path.join(os.path.dirname(app.instance_path), 'flask_sessions')
+    app.config["SESSION_TYPE"] = "filesystem"
+    app.config["SESSION_PERMANENT"] = False
+    app.config["SESSION_USE_SIGNER"] = True
+    app.config["SESSION_FILE_DIR"] = os.path.join(
+        os.path.dirname(app.instance_path), "flask_sessions"
+    )
 
     # Set up the Dependency Injection Container
     di_container = DIContainer(app)
@@ -96,18 +99,18 @@ def _register_blueprints(app: Flask) -> None:
     Args:
         app: The Flask application instance
     """
-    from api.blueprints.auth import auth_bp
-    from api.blueprints.files import files_bp
-    from api.blueprints.search import search_bp
-    from api.blueprints.models import models_bp
-    from api.blueprints.queue import queue_bp
+    from api.blueprints.auth import auth_bp  # noqa: E402
+    from api.blueprints.files import files_bp  # noqa: E402
+    from api.blueprints.models import models_bp  # noqa: E402
+    from api.blueprints.queue import queue_bp  # noqa: E402
+    from api.blueprints.search import search_bp  # noqa: E402
 
     # Register blueprints
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(files_bp, url_prefix='/api/files')
-    app.register_blueprint(search_bp, url_prefix='/api/search')
-    app.register_blueprint(models_bp, url_prefix='/api/models')
-    app.register_blueprint(queue_bp, url_prefix='/api/queue')
+    app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(files_bp, url_prefix="/api/files")
+    app.register_blueprint(search_bp, url_prefix="/api/search")
+    app.register_blueprint(models_bp, url_prefix="/api/models")
+    app.register_blueprint(queue_bp, url_prefix="/api/queue")
 
 
 def _register_error_handlers(app: Flask) -> None:
@@ -116,7 +119,8 @@ def _register_error_handlers(app: Flask) -> None:
     Args:
         app: The Flask application instance
     """
-    from api.error_handlers import register_error_handlers
+    from api.error_handlers import register_error_handlers  # noqa: E402
+
     register_error_handlers(app)
 
 
@@ -127,5 +131,6 @@ def _register_commands(app: Flask) -> None:
         app: The Flask application instance
     """
     # Import CLI commands here to avoid circular imports
-    from cli import register_commands
+    from cli import register_commands  # noqa: E402
+
     register_commands(app)

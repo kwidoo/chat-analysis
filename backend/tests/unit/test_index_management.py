@@ -1,17 +1,17 @@
 import os
-import pytest
-import tempfile
 import shutil
-import numpy as np
-import faiss
+import tempfile
 import threading
-import git
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
-from services.index_version_manager import GitIndexVersionManager
-from services.index_health_monitor import IndexHealthMonitor
+import faiss
+import git
+import numpy as np
+import pytest
 from services.distributed_indexer import DaskDistributedIndexer
+from services.index_health_monitor import IndexHealthMonitor
+from services.index_version_manager import GitIndexVersionManager
 
 
 @pytest.fixture
@@ -29,20 +29,20 @@ class TestGitIndexVersionManager:
     def version_manager(self, temp_dir):
         """Create a version manager for testing"""
         config = {
-            'FAISS_DIR': os.path.join(temp_dir, 'faiss'),
-            'MODELS_DIR': os.path.join(temp_dir, 'models'),
-            'ACTIVE_MODEL': 'v1',
+            "FAISS_DIR": os.path.join(temp_dir, "faiss"),
+            "MODELS_DIR": os.path.join(temp_dir, "models"),
+            "ACTIVE_MODEL": "v1",
         }
         manager = GitIndexVersionManager(config)
 
         # Create a dummy index for testing
-        index_dir = Path(config['FAISS_DIR']) / 'indexes' / 'v1'
+        index_dir = Path(config["FAISS_DIR"]) / "indexes" / "v1"
         index_dir.mkdir(parents=True, exist_ok=True)
-        index_path = index_dir / 'index.index'
+        index_path = index_dir / "index.index"
 
         # Create a simple index with one vector
         index = faiss.IndexFlatL2(128)
-        vec = np.random.random(128).astype('float32').reshape(1, -1)
+        vec = np.random.random(128).astype("float32").reshape(1, -1)
         index.add(vec)
         faiss.write_index(index, str(index_path))
 
@@ -50,8 +50,8 @@ class TestGitIndexVersionManager:
 
     def test_init_creates_git_repo(self, version_manager):
         """Test that the init method creates a Git repository"""
-        assert os.path.exists(os.path.join(version_manager.git_repo_dir, '.git'))
-        assert os.path.exists(os.path.join(version_manager.git_repo_dir, 'README.md'))
+        assert os.path.exists(os.path.join(version_manager.git_repo_dir, ".git"))
+        assert os.path.exists(os.path.join(version_manager.git_repo_dir, "README.md"))
 
     def test_commit_version(self, version_manager):
         """Test committing a version"""
@@ -62,7 +62,9 @@ class TestGitIndexVersionManager:
         assert len(version_id) > 0
 
         # Check that the index was copied to the repository
-        assert os.path.exists(os.path.join(version_manager.git_repo_dir, 'indexes', 'v1', 'index.index'))
+        assert os.path.exists(
+            os.path.join(version_manager.git_repo_dir, "indexes", "v1", "index.index")
+        )
 
     def test_list_versions(self, version_manager):
         """Test listing versions"""
@@ -70,21 +72,20 @@ class TestGitIndexVersionManager:
         version_id1 = version_manager.commit_version("First commit")
 
         # Modify the index and commit again
-        index_path = version_manager.index_dir / 'v1' / 'index.index'
+        index_path = version_manager.index_dir / "v1" / "index.index"
         index = faiss.read_index(str(index_path))
-        vec = np.random.random(128).astype('float32').reshape(1, -1)
+        vec = np.random.random(128).astype("float32").reshape(1, -1)
         index.add(vec)
         faiss.write_index(index, str(index_path))
 
-        version_id2 = version_manager.commit_version("Second commit")
+        version_manager.commit_version("Second commit")
 
         # List versions
         versions = version_manager.list_versions()
 
         # Check that we have at least the commits we created (plus initial repo setup)
         assert len(versions) >= 2
-        assert version_id1 in [v['id'] for v in versions]
-        assert version_id2 in [v['id'] for v in versions]
+        assert version_id1 in [v["id"] for v in versions]
 
     def test_tag_version(self, version_manager):
         """Test tagging a version"""
@@ -97,29 +98,27 @@ class TestGitIndexVersionManager:
 
         # Check that the tag exists
         versions = version_manager.list_versions()
-        tagged_version = next(v for v in versions if v['id'] == version_id)
-        assert tag_name in tagged_version['tags']
+        tagged_version = next(v for v in versions if v["id"] == version_id)
+        assert tag_name in tagged_version["tags"]
 
     def test_rollback(self, version_manager):
         """Test rolling back to a previous version"""
         # Initial commit
-        initial_path = version_manager.index_dir / 'v1' / 'index.index'
+        initial_path = version_manager.index_dir / "v1" / "index.index"
         initial_index = faiss.read_index(str(initial_path))
         initial_count = initial_index.ntotal
 
         version_id1 = version_manager.commit_version("Initial version")
 
         # Modify the index and commit again
-        index_path = version_manager.index_dir / 'v1' / 'index.index'
+        index_path = version_manager.index_dir / "v1" / "index.index"
         index = faiss.read_index(str(index_path))
-        vec = np.random.random(128).astype('float32').reshape(1, -1)
+        vec = np.random.random(128).astype("float32").reshape(1, -1)
         index.add(vec)
         faiss.write_index(index, str(index_path))
 
         modified_index = faiss.read_index(str(index_path))
         modified_count = modified_index.ntotal
-
-        version_id2 = version_manager.commit_version("Modified version")
 
         # Check that the counts are different
         assert initial_count != modified_count
@@ -140,21 +139,21 @@ class TestIndexHealthMonitor:
     def health_monitor(self, temp_dir):
         """Create a health monitor for testing"""
         config = {
-            'FAISS_DIR': os.path.join(temp_dir, 'faiss'),
-            'ACTIVE_MODEL': 'v1',
-            'HEALTH_CHECK_INTERVAL': 1,  # 1 second for faster tests
-            'VACUUM_THRESHOLD': 20,
-            'VACUUM_INTERVAL': 0.01,  # 0.01 hours (36 seconds) for faster tests
+            "FAISS_DIR": os.path.join(temp_dir, "faiss"),
+            "ACTIVE_MODEL": "v1",
+            "HEALTH_CHECK_INTERVAL": 1,  # 1 second for faster tests
+            "VACUUM_THRESHOLD": 20,
+            "VACUUM_INTERVAL": 0.01,  # 0.01 hours (36 seconds) for faster tests
         }
 
         # Create a dummy index for testing
-        index_dir = Path(config['FAISS_DIR']) / 'indexes' / 'v1'
+        index_dir = Path(config["FAISS_DIR"]) / "indexes" / "v1"
         index_dir.mkdir(parents=True, exist_ok=True)
-        index_path = index_dir / 'index.index'
+        index_path = index_dir / "index.index"
 
         # Create a simple index with one vector
         index = faiss.IndexFlatL2(128)
-        vec = np.random.random(128).astype('float32').reshape(1, -1)
+        vec = np.random.random(128).astype("float32").reshape(1, -1)
         index.add(vec)
         faiss.write_index(index, str(index_path))
 
@@ -166,38 +165,40 @@ class TestIndexHealthMonitor:
         metrics = health_monitor.check_index_health()
 
         # Check that we have basic metrics
-        assert metrics['status'] == 'healthy'
-        assert 'ntotal' in metrics
-        assert metrics['ntotal'] == 1
-        assert 'dimension' in metrics
-        assert metrics['dimension'] == 128
-        assert 'check_time_ms' in metrics
+        assert metrics["status"] == "healthy"
+        assert "ntotal" in metrics
+        assert metrics["ntotal"] == 1
+        assert "dimension" in metrics
+        assert metrics["dimension"] == 128
+        assert "check_time_ms" in metrics
 
     def test_detect_corruption(self, health_monitor):
         """Test corruption detection"""
         result = health_monitor.detect_corruption()
 
         # Check that the index is healthy
-        assert result['status'] == 'healthy'
-        assert result['header_check'] == 'passed'
-        assert result['structure_check'] == 'passed'
+        assert result["status"] == "healthy"
+        assert result["header_check"] == "passed"
+        assert result["structure_check"] == "passed"
 
         # Check that detection is fast
-        assert result['check_time_ms'] < 1000  # Should be < 1s
+        assert result["check_time_ms"] < 1000  # Should be < 1s
 
     def test_vacuum_index(self, health_monitor):
         """Test vacuuming the index"""
         result = health_monitor.vacuum_index()
 
         # Check that the vacuum completed
-        assert result['status'] == 'completed'
-        assert result['original_count'] == 1
-        assert result['new_count'] == 1
-        assert 'backup_created' in result
+        assert result["status"] == "completed"
+        assert result["original_count"] == 1
+        assert result["new_count"] == 1
+        assert "backup_created" in result
 
 
-@pytest.mark.skipif(os.environ.get('CI') == 'true',
-                    reason="Dask tests need a real distributed environment")
+@pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason="Dask tests need a real distributed environment",
+)
 class TestDaskDistributedIndexer:
     """Tests for the DaskDistributedIndexer class"""
 
@@ -205,13 +206,13 @@ class TestDaskDistributedIndexer:
     def distributed_indexer(self, temp_dir):
         """Create a distributed indexer for testing"""
         config = {
-            'FAISS_DIR': os.path.join(temp_dir, 'faiss'),
-            'ACTIVE_MODEL': 'v1',
-            'DASK_SCHEDULER_ADDRESS': 'tcp://localhost:8786',  # Use local Dask scheduler
-            'CHUNK_SIZE': 100,
-            'MAX_WORKERS': 2,
-            'INDEX_TYPE': 'flat',
-            'IVF_NLIST': 10,
+            "FAISS_DIR": os.path.join(temp_dir, "faiss"),
+            "ACTIVE_MODEL": "v1",
+            "DASK_SCHEDULER_ADDRESS": "tcp://localhost:8786",  # Use local Dask scheduler
+            "CHUNK_SIZE": 100,
+            "MAX_WORKERS": 2,
+            "INDEX_TYPE": "flat",
+            "IVF_NLIST": 10,
         }
 
         # Skip test if no Dask scheduler available
@@ -219,7 +220,8 @@ class TestDaskDistributedIndexer:
 
         try:
             from dask.distributed import Client
-            client = Client(config['DASK_SCHEDULER_ADDRESS'])
+
+            client = Client(config["DASK_SCHEDULER_ADDRESS"])
             client.close()
         except Exception:
             pytest.skip("No Dask scheduler available at localhost:8786")
@@ -232,7 +234,7 @@ class TestDaskDistributedIndexer:
         # Create test embeddings
         num_vectors = 500
         dimension = 128
-        embeddings = np.random.random((num_vectors, dimension)).astype('float32')
+        embeddings = np.random.random((num_vectors, dimension)).astype("float32")
 
         # Build index
         index_path = distributed_indexer.build_index(embeddings, dimension)
@@ -251,7 +253,7 @@ class TestDaskDistributedIndexer:
 
         # Create 5 batches of 100 vectors each
         for i in range(5):
-            batch = np.random.random((100, dimension)).astype('float32')
+            batch = np.random.random((100, dimension)).astype("float32")
             batches.append(batch)
 
         # Create batch generator

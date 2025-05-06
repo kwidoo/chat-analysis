@@ -13,6 +13,7 @@ from services.auth_service import AuthService, User
 
 class OAuthProvider(BaseModel):
     """Configuration for an OAuth provider."""
+
     name: str
     client_id: str
     client_secret: str
@@ -74,7 +75,7 @@ class OAuthIntegration:
                 f"/auth/{provider_name}/login",
                 login_endpoint,
                 lambda p=provider_name: self._handle_login(p),
-                methods=["GET"]
+                methods=["GET"],
             )
 
             # Add callback route
@@ -82,17 +83,19 @@ class OAuthIntegration:
                 f"/auth/{provider_name}/callback",
                 callback_endpoint,
                 lambda p=provider_name: self._handle_callback(p),
-                methods=["GET"]
+                methods=["GET"],
             )
 
         # Add session config
-        app.config.setdefault('SESSION_TYPE', 'filesystem')
-        app.config.setdefault('SESSION_PERMANENT', False)
-        app.config.setdefault('SESSION_USE_SIGNER', True)
-        app.config.setdefault('SESSION_KEY_PREFIX', 'oauth_')
+        app.config.setdefault("SESSION_TYPE", "filesystem")
+        app.config.setdefault("SESSION_PERMANENT", False)
+        app.config.setdefault("SESSION_USE_SIGNER", True)
+        app.config.setdefault("SESSION_KEY_PREFIX", "oauth_")
 
         # Add utility routes
-        app.add_url_rule("/auth/providers", "oauth_providers", self._list_providers, methods=["GET"])
+        app.add_url_rule(
+            "/auth/providers", "oauth_providers", self._list_providers, methods=["GET"]
+        )
 
     def _handle_login(self, provider_name: str):
         """Handle the initial OAuth login request."""
@@ -180,10 +183,7 @@ class OAuthIntegration:
             session.pop("oauth_state", None)
 
             # Return tokens with success response
-            return {
-                "message": "Authentication successful",
-                **tokens
-            }
+            return {"message": "Authentication successful", **tokens}
 
         except Exception as e:
             return {"error": f"OAuth error: {str(e)}"}, 500
@@ -198,8 +198,9 @@ class OAuthIntegration:
             raise ValueError("Email is required from OAuth provider")
 
         # Look for an existing user with this email
-        existing_user = next((u for u in self.auth_service._users.values()
-                            if u.username == email), None)
+        existing_user = next(
+            (u for u in self.auth_service._users.values() if u.username == email), None
+        )
 
         if existing_user:
             return existing_user
@@ -208,8 +209,8 @@ class OAuthIntegration:
         random_password = secrets.token_urlsafe(16)
         user = self.auth_service.create_user(
             username=email,
-            password=random_password,  # They won't use this password
-            roles=["user"]
+            password=random_password,
+            roles=["user"],  # They won't use this password
         )
 
         return user
@@ -231,8 +232,9 @@ def create_google_provider(client_id: str, client_secret: str) -> OAuthProvider:
         token_url="https://oauth2.googleapis.com/token",
         userinfo_url="https://www.googleapis.com/oauth2/v3/userinfo",
         scopes=["openid", "email", "profile"],
-        redirect_path="/auth/google/callback"
+        redirect_path="/auth/google/callback",
     )
+
 
 def create_github_provider(client_id: str, client_secret: str) -> OAuthProvider:
     """Create a GitHub OAuth provider configuration."""
@@ -244,5 +246,5 @@ def create_github_provider(client_id: str, client_secret: str) -> OAuthProvider:
         token_url="https://github.com/login/oauth/access_token",
         userinfo_url="https://api.github.com/user",
         scopes=["read:user", "user:email"],
-        redirect_path="/auth/github/callback"
+        redirect_path="/auth/github/callback",
     )

@@ -4,25 +4,30 @@ Dependency Injection Container
 This module implements the Dependency Inversion Principle (D in SOLID)
 by providing a container that manages service dependencies and their lifecycles.
 """
-import os
+
 import logging
-from typing import Dict, Any
+import os
+from typing import Type  # Only import what's needed
 
-from interfaces.auth import IAuthService, IUserService, ITokenService, IMFAService
+from interfaces.auth import IAuthService, IMFAService, ITokenService, IUserService
 from interfaces.embedding import IEmbeddingService
-from interfaces.index import IIndexService, IIndexHealthMonitorService, IIndexVersionManager
-from interfaces.queue import IQueueService, IFileProcessorProducer, IFileProcessorConsumer
+from interfaces.index import IIndexService
 from interfaces.message_broker import IMessageBroker
-
-# Service implementations
-from services.impl.token_service import JWTTokenServiceImpl
-from services.impl.mfa_service import TOTPMFAServiceImpl
-from services.impl.user_service import UserServiceImpl
-from services.impl.auth_service import AuthServiceImpl
-from services.impl.message_broker import RabbitMQConnectionPool
-from services.impl.file_processor_producer import FileProcessorProducerImpl
-from services.impl.file_processor_consumer import SupervisorProcessImpl
+from interfaces.queue import (
+    IFileProcessorConsumer,
+    IFileProcessorProducer,
+    IQueueService,
+)
 from services.embedding_service import ModelRegistry
+from services.impl.auth_service import AuthServiceImpl
+from services.impl.file_processor_consumer import SupervisorProcessImpl
+from services.impl.file_processor_producer import FileProcessorProducerImpl
+from services.impl.message_broker import RabbitMQConnectionPool
+from services.impl.mfa_service import TOTPMFAServiceImpl
+
+# Import service implementations
+from services.impl.token_service import JWTTokenServiceImpl
+from services.impl.user_service import UserServiceImpl
 
 
 class DIContainer:
@@ -64,36 +69,33 @@ class DIContainer:
     def _setup_auth_services(self) -> None:
         """Set up authentication-related services"""
         # Configuration
-        secret_key = self.app.config.get('SECRET_KEY', 'default-secret-key')
-        token_expiry = self.app.config.get('ACCESS_TOKEN_EXPIRY', 3600)
-        refresh_expiry = self.app.config.get('REFRESH_TOKEN_EXPIRY', 604800)
+        secret_key = self.app.config.get("SECRET_KEY", "default-secret-key")
+        token_expiry = self.app.config.get("ACCESS_TOKEN_EXPIRY", 3600)
+        refresh_expiry = self.app.config.get("REFRESH_TOKEN_EXPIRY", 604800)
 
         # Create token service
         token_service = JWTTokenServiceImpl(
             secret_key=secret_key,
             token_expiry=token_expiry,
-            refresh_expiry=refresh_expiry
+            refresh_expiry=refresh_expiry,
         )
         self._services[ITokenService] = token_service
 
         # Create MFA service
         mfa_service = TOTPMFAServiceImpl(
-            issuer_name=self.app.config.get('APP_NAME', 'AI3 Application')
+            issuer_name=self.app.config.get("APP_NAME", "AI3 Application")
         )
         self._services[IMFAService] = mfa_service
 
         # Create user service
-        user_service = UserServiceImpl(
-            token_service=token_service,
-            mfa_service=mfa_service
-        )
+        user_service = UserServiceImpl(token_service=token_service, mfa_service=mfa_service)
         self._services[IUserService] = user_service
 
         # Create composite auth service
         auth_service = AuthServiceImpl(
             user_service=user_service,
             token_service=token_service,
-            mfa_service=mfa_service
+            mfa_service=mfa_service,
         )
         self._services[IAuthService] = auth_service
 
@@ -102,18 +104,13 @@ class DIContainer:
     def _setup_message_broker(self) -> None:
         """Set up message broker service"""
         # Configuration
-        host = self.app.config.get('RABBITMQ_HOST', 'localhost')
-        port = self.app.config.get('RABBITMQ_PORT', 5672)
-        user = self.app.config.get('RABBITMQ_USER', 'guest')
-        password = self.app.config.get('RABBITMQ_PASSWORD', 'guest')
+        host = self.app.config.get("RABBITMQ_HOST", "localhost")
+        port = self.app.config.get("RABBITMQ_PORT", 5672)
+        user = self.app.config.get("RABBITMQ_USER", "guest")
+        password = self.app.config.get("RABBITMQ_PASSWORD", "guest")
 
         # Create message broker
-        message_broker = RabbitMQConnectionPool(
-            host=host,
-            port=port,
-            user=user,
-            password=password
-        )
+        message_broker = RabbitMQConnectionPool(host=host, port=port, user=user, password=password)
         self._services[IMessageBroker] = message_broker
 
         self.logger.info(f"Message broker set up with host: {host}")
@@ -124,12 +121,14 @@ class DIContainer:
         message_broker = self.get_service(IMessageBroker)
 
         # Configuration
-        task_store_dir = self.app.config.get('TASK_STORE_DIR', os.path.join(os.path.dirname(self.app.instance_path), 'queues/tasks'))
+        task_store_dir = self.app.config.get(
+            "TASK_STORE_DIR",
+            os.path.join(os.path.dirname(self.app.instance_path), "queues/tasks"),
+        )
 
         # Create file processor producer
         file_processor_producer = FileProcessorProducerImpl(
-            message_broker=message_broker,
-            task_store_dir=task_store_dir
+            message_broker=message_broker, task_store_dir=task_store_dir
         )
         self._services[IFileProcessorProducer] = file_processor_producer
 
@@ -140,7 +139,7 @@ class DIContainer:
     def _setup_embedding_service(self) -> None:
         """Set up embedding service"""
         # Get the default model version from config
-        default_model = self.app.config.get('DEFAULT_MODEL', 'v1')
+        default_model = self.app.config.get("DEFAULT_MODEL", "v1")
 
         # Create embedding service
         embedding_service = ModelRegistry.get_embedding_service(default_model)
@@ -224,15 +223,16 @@ class DIContainer:
             index_service = self.get_service(IIndexService)
 
             if message_broker and embedding_service and index_service:
-                task_store_dir = self.app.config.get('TASK_STORE_DIR',
-                                                    os.path.join(os.path.dirname(self.app.instance_path),
-                                                                'queues/tasks'))
+                task_store_dir = self.app.config.get(
+                    "TASK_STORE_DIR",
+                    os.path.join(os.path.dirname(self.app.instance_path), "queues/tasks"),
+                )
 
                 consumer = SupervisorProcessImpl(
                     message_broker=message_broker,
                     embedding_service=embedding_service,
                     index_service=index_service,
-                    task_store_dir=task_store_dir
+                    task_store_dir=task_store_dir,
                 )
 
                 self._services[IFileProcessorConsumer] = consumer

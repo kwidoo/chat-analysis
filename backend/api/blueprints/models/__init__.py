@@ -1,6 +1,7 @@
 from flask import Blueprint
 
-models_bp = Blueprint('models', __name__, url_prefix='/api/models')
+from . import (
+    routes,
+)  # noqa: F401  # Import the routes to register them with the blueprint
 
-# Import the routes to register them with the blueprint
-from . import routes
+models_bp = Blueprint("models", __name__, url_prefix="/api/models")

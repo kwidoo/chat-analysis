@@ -4,6 +4,7 @@ Message Broker Interface
 This module defines interfaces for message broker operations,
 implementing the Interface Segregation Principle (I in SOLID).
 """
+
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Dict
 
@@ -35,8 +36,13 @@ class IMessageBroker(ABC):
         pass
 
     @abstractmethod
-    def publish_message(self, exchange: str, routing_key: str, message: Dict[str, Any],
-                        properties: Optional[Dict[str, Any]] = None) -> bool:
+    def publish_message(
+        self,
+        exchange: str,
+        routing_key: str,
+        message: Dict[str, Any],
+        properties: Optional[Dict[str, Any]] = None,
+    ) -> bool:
         """Publish a message to an exchange
 
         Args:
@@ -51,8 +57,13 @@ class IMessageBroker(ABC):
         pass
 
     @abstractmethod
-    def declare_queue(self, queue_name: str, durable: bool = True,
-                      exclusive: bool = False, auto_delete: bool = False) -> Any:
+    def declare_queue(
+        self,
+        queue_name: str,
+        durable: bool = True,
+        exclusive: bool = False,
+        auto_delete: bool = False,
+    ) -> Any:
         """Declare a queue
 
         Args:

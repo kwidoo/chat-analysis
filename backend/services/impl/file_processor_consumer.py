@@ -4,6 +4,7 @@ File Processor Consumer Implementation
 This module provides an implementation of the IFileProcessorConsumer interface
 for consuming file processing tasks from a queue.
 """
+
 import os
 import json
 import time
@@ -21,12 +22,14 @@ from interfaces.message_broker import IMessageBroker
 class SupervisorProcessImpl(IFileProcessorConsumer):
     """Implementation of the file processor consumer interface"""
 
-    def __init__(self,
-                 message_broker: IMessageBroker,
-                 embedding_service: IEmbeddingService,
-                 index_service: IIndexService,
-                 task_store_dir: str,
-                 worker_count: int = 3):
+    def __init__(
+        self,
+        message_broker: IMessageBroker,
+        embedding_service: IEmbeddingService,
+        index_service: IIndexService,
+        task_store_dir: str,
+        worker_count: int = 3,
+    ):
         """Initialize the file processor consumer
 
         Args:
@@ -47,7 +50,7 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
         os.makedirs(self.task_store_dir, exist_ok=True)
 
         # Queue name for file processing tasks
-        self.queue_name = 'file_processing'
+        self.queue_name = "file_processing"
 
         # Worker threads
         self.workers = []
@@ -62,20 +65,14 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
 
         # Ensure the queue exists
         try:
-            self.message_broker.declare_queue(
-                queue_name=self.queue_name,
-                durable=True
-            )
+            self.message_broker.declare_queue(queue_name=self.queue_name, durable=True)
         except Exception as e:
             self.logger.error(f"Failed to declare queue {self.queue_name}: {e}")
             return
 
         # Create and start worker threads
         for i in range(self.worker_count):
-            worker = threading.Thread(
-                target=self._worker_thread,
-                name=f"FileProcessorWorker-{i}"
-            )
+            worker = threading.Thread(target=self._worker_thread, name=f"FileProcessorWorker-{i}")
             worker.daemon = True  # Thread will exit when main thread exits
             worker.start()
             self.workers.append(worker)
@@ -108,15 +105,15 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
 
             # Update task status
             task_data = self._load_task_data(task_id) or {
-                'task_id': task_id,
-                'file_path': file_path,
-                'status': 'processing'
+                "task_id": task_id,
+                "file_path": file_path,
+                "status": "processing",
             }
-            task_data['status'] = 'processing'
+            task_data["status"] = "processing"
             self._save_task_data(task_id, task_data)
 
             # Read the file
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 text = f.read()
 
             # Generate embedding
@@ -127,15 +124,15 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
 
             if result:
                 # Update task status to complete
-                task_data['status'] = 'completed'
-                task_data['processed_at'] = time.time()
+                task_data["status"] = "completed"
+                task_data["processed_at"] = time.time()
                 self._save_task_data(task_id, task_data)
                 self.logger.info(f"Successfully processed file {file_path} for task {task_id}")
                 return True
             else:
                 # Update task status to failed
-                task_data['status'] = 'failed'
-                task_data['error'] = 'Failed to add embedding to index'
+                task_data["status"] = "failed"
+                task_data["error"] = "Failed to add embedding to index"
                 self._save_task_data(task_id, task_data)
                 self.logger.error(f"Failed to add embedding to index for file {file_path}")
                 return False
@@ -143,12 +140,12 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
         except Exception as e:
             # Update task status to failed
             task_data = self._load_task_data(task_id) or {
-                'task_id': task_id,
-                'file_path': file_path
+                "task_id": task_id,
+                "file_path": file_path,
             }
-            task_data['status'] = 'failed'
-            task_data['error'] = str(e)
-            task_data['traceback'] = traceback.format_exc()
+            task_data["status"] = "failed"
+            task_data["error"] = str(e)
+            task_data["traceback"] = traceback.format_exc()
             self._save_task_data(task_id, task_data)
 
             self.logger.error(f"Error processing file {file_path} for task {task_id}: {e}")
@@ -171,8 +168,8 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
                     try:
                         # Parse message
                         message = json.loads(body)
-                        task_id = message.get('task_id')
-                        file_path = message.get('file_path')
+                        task_id = message.get("task_id")
+                        file_path = message.get("file_path")
 
                         if not task_id or not file_path:
                             self.logger.error("Invalid message format")
@@ -199,9 +196,7 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
 
                 # Start consuming
                 channel.basic_consume(
-                    queue=self.queue_name,
-                    on_message_callback=callback,
-                    auto_ack=False
+                    queue=self.queue_name, on_message_callback=callback, auto_ack=False
                 )
 
                 self.logger.info(f"Worker {threading.current_thread().name} waiting for messages")
@@ -227,7 +222,7 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
         """
         try:
             task_file = os.path.join(self.task_store_dir, f"{task_id}.json")
-            with open(task_file, 'w') as f:
+            with open(task_file, "w") as f:
                 json.dump(task_data, f)
         except Exception as e:
             self.logger.error(f"Error saving task data for {task_id}: {e}")
@@ -246,7 +241,7 @@ class SupervisorProcessImpl(IFileProcessorConsumer):
             if not os.path.exists(task_file):
                 return None
 
-            with open(task_file, 'r') as f:
+            with open(task_file, "r") as f:
                 return json.load(f)
         except Exception as e:
             self.logger.error(f"Error loading task data for {task_id}: {e}")

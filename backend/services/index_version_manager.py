@@ -1,16 +1,17 @@
-import os
-import git
-import shutil
-import logging
-import json
-import time
-import faiss
 import hashlib
-import numpy as np
-from pathlib import Path
+import json
+import logging
+import os
+import shutil
+import time
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any, Union
-from git import Repo, GitError, GitCommandError
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import faiss
+import git
+import numpy as np
+from git import GitCommandError, GitError, Repo
 from services.interfaces import IndexVersionManagerInterface
 
 logger = logging.getLogger(__name__)
@@ -29,28 +30,28 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
                 - MODELS_DIR: Directory for model versions
                 - ACTIVE_MODEL: Current active model name
         """
-        self.faiss_dir = Path(config.get('FAISS_DIR', './faiss'))
-        self.git_repo_dir = Path(config.get('GIT_REPO_DIR', self.faiss_dir / 'git_repo'))
-        self.models_dir = Path(config.get('MODELS_DIR', './models'))
-        self.active_model = config.get('ACTIVE_MODEL', 'v1')
+        self.faiss_dir = Path(config.get("FAISS_DIR", "./faiss"))
+        self.git_repo_dir = Path(config.get("GIT_REPO_DIR", self.faiss_dir / "git_repo"))
+        self.models_dir = Path(config.get("MODELS_DIR", "./models"))
+        self.active_model = config.get("ACTIVE_MODEL", "v1")
 
         # Ensure directories exist
         self.faiss_dir.mkdir(parents=True, exist_ok=True)
         self.git_repo_dir.mkdir(parents=True, exist_ok=True)
 
         # Index directories
-        self.index_dir = self.faiss_dir / 'indexes'
+        self.index_dir = self.faiss_dir / "indexes"
         self.index_dir.mkdir(parents=True, exist_ok=True)
 
         # Migration scripts directory
-        self.migration_dir = self.faiss_dir / 'migrations'
+        self.migration_dir = self.faiss_dir / "migrations"
         self.migration_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize or open Git repository
         self.repo = self._initialize_git_repo()
 
         # Metadata storage directory
-        self.metadata_dir = self.git_repo_dir / 'metadata'
+        self.metadata_dir = self.git_repo_dir / "metadata"
         self.metadata_dir.mkdir(parents=True, exist_ok=True)
 
     def _initialize_git_repo(self) -> git.Repo:
@@ -59,35 +60,33 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
         Returns:
             git.Repo: Git repository instance
         """
-        if not (self.git_repo_dir / '.git').exists():
+        if not (self.git_repo_dir / ".git").exists():
             # Create new Git repository
             repo = git.Repo.init(self.git_repo_dir)
 
             # Create initial .gitignore
-            gitignore_path = self.git_repo_dir / '.gitignore'
-            with open(gitignore_path, 'w') as f:
+            gitignore_path = self.git_repo_dir / ".gitignore"
+            with open(gitignore_path, "w") as f:
                 f.write("*.temp\n*.lock\n*.log\n")
 
             # Create initial README
-            readme_path = self.git_repo_dir / 'README.md'
-            with open(readme_path, 'w') as f:
+            readme_path = self.git_repo_dir / "README.md"
+            with open(readme_path, "w") as f:
                 f.write("# FAISS Index Version Repository\n\n")
                 f.write("This repository contains versioned FAISS indexes.\n")
                 f.write(f"Created: {datetime.now().isoformat()}\n")
 
             # Initial commit
             repo.git.add(A=True)
-            repo.git.commit('-m', 'Initial repository setup')
+            repo.git.commit("-m", "Initial repository setup")
 
             # Create directory for indexes
-            index_storage = self.git_repo_dir / 'indexes'
-            index_storage.mkdir(exist_ok=True)
-            metadata_dir = self.git_repo_dir / 'metadata'
-            metadata_dir.mkdir(exist_ok=True)
+            (self.git_repo_dir / "indexes").mkdir(exist_ok=True)
+            (self.git_repo_dir / "metadata").mkdir(exist_ok=True)
 
             # Commit directory structure
             repo.git.add(A=True)
-            repo.git.commit('-m', 'Create directory structure')
+            repo.git.commit("-m", "Create directory structure")
 
             logger.info(f"Initialized new Git repository at {self.git_repo_dir}")
             return repo
@@ -112,7 +111,7 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
             raise FileNotFoundError(f"Index file not found at {source_path}")
 
         # Destination in Git repo
-        dest_dir = self.git_repo_dir / 'indexes' / model_version
+        dest_dir = self.git_repo_dir / "indexes" / model_version
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest_path = dest_dir / "index.index"
 
@@ -142,12 +141,12 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
             "index_type": type(index).__name__,
             "timestamp": datetime.now().isoformat(),
             "index_size_bytes": os.path.getsize(source_path),
-            "index_hash": self._compute_file_hash(source_path)
+            "index_hash": self._compute_file_hash(source_path),
         }
 
         # Save metadata
         metadata_path = self.metadata_dir / f"{model_version}_metadata.json"
-        with open(metadata_path, 'w') as f:
+        with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
 
     def _compute_file_hash(self, file_path: Path) -> str:
@@ -182,7 +181,7 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
             self.repo.git.add(A=True)
 
             # Commit
-            commit = self.repo.git.commit('-m', message)
+            self.repo.git.commit("-m", message)
             commit_hash = self.repo.head.commit.hexsha
 
             logger.info(f"Committed index version: {commit_hash[:10]} - {message}")
@@ -201,7 +200,9 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
         """
         try:
             # Create the tag
-            self.repo.create_tag(tag, ref=version_id, message=f"Tag {tag} for version {version_id[:10]}")
+            self.repo.create_tag(
+                tag, ref=version_id, message=f"Tag {tag} for version {version_id[:10]}"
+            )
             logger.info(f"Tagged version {version_id[:10]} as {tag}")
 
         except (GitError, Exception) as e:
@@ -220,16 +221,16 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
         try:
             # Check if version exists
             try:
-                commit = self.repo.commit(version_id)
+                commit = self.repo.commit(version_id)  # noqa: F841
             except (GitError, ValueError):
                 logger.error(f"Version {version_id} not found")
                 return False
 
             # Get the index file from that commit
-            index_path = self.git_repo_dir / 'indexes' / self.active_model / "index.index"
+            index_path = self.git_repo_dir / "indexes" / self.active_model / "index.index"
 
             # Checkout that specific file from the commit
-            self.repo.git.checkout(version_id, '--', str(index_path))
+            self.repo.git.checkout(version_id, "--", str(index_path))
 
             # Copy it back to the active index location
             dest_path = self.index_dir / self.active_model / "index.index"
@@ -259,15 +260,17 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
                 # Get tags for this commit
                 tags = [tag.name for tag in self.repo.tags if tag.commit == commit]
 
-                versions.append({
-                    "id": commit.hexsha,
-                    "short_id": commit.hexsha[:10],
-                    "date": datetime.fromtimestamp(commit.committed_date).isoformat(),
-                    "timestamp": commit.committed_date,
-                    "message": commit.message,
-                    "author": f"{commit.author.name} <{commit.author.email}>",
-                    "tags": tags
-                })
+                versions.append(
+                    {
+                        "id": commit.hexsha,
+                        "short_id": commit.hexsha[:10],
+                        "date": datetime.fromtimestamp(commit.committed_date).isoformat(),
+                        "timestamp": commit.committed_date,
+                        "message": commit.message,
+                        "author": f"{commit.author.name} <{commit.author.email}>",
+                        "tags": tags,
+                    }
+                )
 
             return versions
 
@@ -299,7 +302,7 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
                 "timestamp": commit.committed_date,
                 "message": commit.message,
                 "author": f"{commit.author.name} <{commit.author.email}>",
-                "tags": tags
+                "tags": tags,
             }
 
             # Try to find metadata for this version
@@ -307,10 +310,12 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
             if metadata_path.exists():
                 # Get the file at this specific commit
                 try:
-                    metadata_content = self.repo.git.show(f"{version_id}:{metadata_path.relative_to(self.git_repo_dir)}")
+                    metadata_content = self.repo.git.show(
+                        f"{version_id}:{metadata_path.relative_to(self.git_repo_dir)}"
+                    )
                     metadata = json.loads(metadata_content)
                     info["metadata"] = metadata
-                except (GitError, Exception) as e:
+                except (GitError, Exception):  # noqa: F841
                     # Metadata might not exist for this commit
                     pass
 
@@ -334,7 +339,9 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
         migration_script = self._find_migration_script(source_version, target_version)
 
         if not migration_script:
-            logger.error(f"No migration script found for {source_version[:10]} -> {target_version[:10]}")
+            logger.error(
+                f"No migration script found for {source_version[:10]} -> {target_version[:10]}"
+            )
             return False
 
         try:
@@ -344,18 +351,32 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
                 # Try to extract it from the repository
                 source_checkout_path = self.index_dir / f"temp_{source_version[:10]}"
                 source_checkout_path.mkdir(exist_ok=True)
-                self.repo.git.checkout(source_version, '--', str(self.git_repo_dir / 'indexes' / self.active_model / "index.index"))
+                self.repo.git.checkout(
+                    source_version,
+                    "--",
+                    str(self.git_repo_dir / "indexes" / self.active_model / "index.index"),
+                )
                 source_index_path = source_checkout_path / "index.index"
-                shutil.copy2(self.git_repo_dir / 'indexes' / self.active_model / "index.index", source_index_path)
+                shutil.copy2(
+                    self.git_repo_dir / "indexes" / self.active_model / "index.index",
+                    source_index_path,
+                )
 
             target_index_path = self._get_index_path_for_version(target_version)
             if not target_index_path.exists():
                 # Try to extract it from the repository
                 target_checkout_path = self.index_dir / f"temp_{target_version[:10]}"
                 target_checkout_path.mkdir(exist_ok=True)
-                self.repo.git.checkout(target_version, '--', str(self.git_repo_dir / 'indexes' / self.active_model / "index.index"))
+                self.repo.git.checkout(
+                    target_version,
+                    "--",
+                    str(self.git_repo_dir / "indexes" / self.active_model / "index.index"),
+                )
                 target_index_path = target_checkout_path / "index.index"
-                shutil.copy2(self.git_repo_dir / 'indexes' / self.active_model / "index.index", target_index_path)
+                shutil.copy2(
+                    self.git_repo_dir / "indexes" / self.active_model / "index.index",
+                    target_index_path,
+                )
 
             # Execute the migration script
             # Note: In a real implementation, this would likely involve importing a Python module
@@ -364,7 +385,10 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
             logger.info(f"Running migration from {source_version[:10]} to {target_version[:10]}")
             time.sleep(1)  # Simulate migration work
 
-            logger.info(f"Migration from {source_version[:10]} to {target_version[:10]} completed successfully")
+            logger.info(
+                f"Migration from {source_version[:10]} to {target_version[:10]} "
+                f"completed successfully"
+            )
             return True
 
         except Exception as e:
@@ -382,7 +406,9 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
             Optional[Path]: Path to migration script if found, None otherwise
         """
         # Look for specific migration script
-        specific_script = self.migration_dir / f"migrate_{source_version[:10]}_{target_version[:10]}.py"
+        specific_script = (
+            self.migration_dir / f"migrate_{source_version[:10]}_{target_version[:10]}.py"
+        )
         if specific_script.exists():
             return specific_script
 
@@ -448,10 +474,10 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
                 temp_dir.mkdir(parents=True, exist_ok=True)
 
                 # Get the index file from the repository
-                repo_index_path = self.git_repo_dir / 'indexes' / self.active_model / "index.index"
+                repo_index_path = self.git_repo_dir / "indexes" / self.active_model / "index.index"
 
                 # Checkout that specific file from the commit
-                self.repo.git.checkout(version_id, '--', str(repo_index_path))
+                self.repo.git.checkout(version_id, "--", str(repo_index_path))
 
                 # Copy to temporary location
                 index_path = temp_dir / "index.index"
@@ -464,7 +490,7 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
                 return {
                     "status": "error",
                     "message": f"Index file not found at {index_path}",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Read the index and check basic health
@@ -484,13 +510,13 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
                     "index_size_bytes": os.path.getsize(index_path),
                     "load_time_seconds": load_time,
                     "file_integrity": True,
-                }
+                },
             }
 
             # Try a simple search to verify functionality
             if index.ntotal > 0:
                 try:
-                    dummy_query = np.random.random(index.d).astype('float32').reshape(1, -1)
+                    dummy_query = np.random.random(index.d).astype("float32").reshape(1, -1)
                     start_time = time.time()
                     distances, indices = index.search(dummy_query, min(10, index.ntotal))
                     search_time = time.time() - start_time
@@ -512,5 +538,5 @@ class GitIndexVersionManager(IndexVersionManagerInterface):
             return {
                 "status": "error",
                 "message": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }

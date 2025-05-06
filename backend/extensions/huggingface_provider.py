@@ -4,11 +4,12 @@ HuggingFace Model Provider
 This module provides an implementation of the BaseModelProvider for HuggingFace models,
 supporting the Open/Closed Principle by allowing new models without modifying existing code.
 """
-import logging
-from typing import Dict, List, Any, Optional
 
-from interfaces.embedding import IEmbeddingService
+import logging
+from typing import Any, List, Optional
+
 from extensions.model_provider import BaseModelProvider, ModelProviderRegistry
+from interfaces.embedding import IEmbeddingService
 
 
 class HuggingFaceEmbeddingService(IEmbeddingService):
@@ -16,10 +17,10 @@ class HuggingFaceEmbeddingService(IEmbeddingService):
 
     # Predefined model dimensions
     MODEL_DIMENSIONS = {
-        'sentence-transformers/all-mpnet-base-v2': 768,
-        'sentence-transformers/all-MiniLM-L6-v2': 384,
-        'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2': 384,
-        'sentence-transformers/paraphrase-albert-small-v2': 768,
+        "sentence-transformers/all-mpnet-base-v2": 768,
+        "sentence-transformers/all-MiniLM-L6-v2": 384,
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": 384,
+        "sentence-transformers/paraphrase-albert-small-v2": 768,
     }
 
     def __init__(self, model_name: str, distributed_client: Optional[Any] = None):
@@ -36,6 +37,7 @@ class HuggingFaceEmbeddingService(IEmbeddingService):
         # Load the model
         try:
             from sentence_transformers import SentenceTransformer
+
             self.model = SentenceTransformer(model_name)
             self.logger.info(f"Loaded HuggingFace model: {model_name}")
         except Exception as e:
@@ -70,12 +72,14 @@ class HuggingFaceEmbeddingService(IEmbeddingService):
         """
         try:
             # Use distributed client if available
-            if self.distributed_client and hasattr(self.distributed_client, 'submit'):
-                self.logger.info(f"Using distributed client for batch embedding of {len(texts)} documents")
+            if self.distributed_client and hasattr(self.distributed_client, "submit"):
+                self.logger.info(
+                    f"Using distributed client for batch embedding of {len(texts)} documents"
+                )
 
                 # Split the batch into smaller chunks
                 chunk_size = 10  # Adjust based on memory constraints
-                chunks = [texts[i:i + chunk_size] for i in range(0, len(texts), chunk_size)]
+                chunks = [texts[i : i + chunk_size] for i in range(0, len(texts), chunk_size)]
 
                 # Submit each chunk as a task
                 futures = []
@@ -123,7 +127,7 @@ class HuggingFaceEmbeddingService(IEmbeddingService):
         # Or query the model
         try:
             return self.model.get_sentence_embedding_dimension()
-        except:
+        except Exception:
             # Generate a sample embedding to determine dimension
             sample_embedding = self.embed_document("Sample text for dimension detection")
             return len(sample_embedding)
@@ -142,10 +146,10 @@ class HuggingFaceProvider(BaseModelProvider):
 
     # Available models
     AVAILABLE_MODELS = {
-        'mpnet-base': 'sentence-transformers/all-mpnet-base-v2',
-        'minilm-l6': 'sentence-transformers/all-MiniLM-L6-v2',
-        'multilingual-minilm': 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2',
-        'albert-small': 'sentence-transformers/paraphrase-albert-small-v2',
+        "mpnet-base": "sentence-transformers/all-mpnet-base-v2",
+        "minilm-l6": "sentence-transformers/all-MiniLM-L6-v2",
+        "multilingual-minilm": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        "albert-small": "sentence-transformers/paraphrase-albert-small-v2",
     }
 
     @classmethod
@@ -157,8 +161,9 @@ class HuggingFaceProvider(BaseModelProvider):
         """
         return "huggingface"
 
-    def get_embedding_service(self, model_name: str,
-                             distributed_client: Optional[Any] = None) -> IEmbeddingService:
+    def get_embedding_service(
+        self, model_name: str, distributed_client: Optional[Any] = None
+    ) -> IEmbeddingService:
         """Get an embedding service for a model
 
         Args:
