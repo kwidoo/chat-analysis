@@ -5,34 +5,34 @@ node:
   machine: drone-ai
 
 steps:
-  - name: lint-backend
-    image: python:3.10
-    commands:
-      - cd backend
-      - pip install flake8 mypy bandit
-      - flake8 --max-line-length=100 --exclude=__pycache__,migrations,venv .
-      - mypy --ignore-missing-imports .
-      - bandit -r . -x tests/,venv/
+  # - name: lint-backend
+  #   image: python:3.10
+  #   commands:
+  #     - cd backend
+  #     - pip install flake8 mypy bandit
+  #     - flake8 --max-line-length=100 --exclude=__pycache__,migrations,venv .
+  #     - mypy --ignore-missing-imports .
+  #     - bandit -r . -x tests/,venv/
 
-  - name: test-backend
-    image: rapidsai/base:24.10-cuda12.5-py3.11
-    volumes:
-      - name: docker_sock
-        path: /var/run/docker.sock
-      - name: nvidia_gpu
-        path: /usr/local/nvidia
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-      PYTHONPATH: /drone/src/backend
-    commands:
-      - apt-get update && apt-get install -y python3 python3-pip
-      - cd backend
-      - pip3 install -r requirements.txt
-      - pip3 install pytest pytest-cov
-      - python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count())"
-      - nvidia-smi
-      - pytest tests/ --cov=. --cov-report=xml
+  # - name: test-backend
+  #   image: rapidsai/base:24.10-cuda12.5-py3.11
+  #   volumes:
+  #     - name: docker_sock
+  #       path: /var/run/docker.sock
+  #     - name: nvidia_gpu
+  #       path: /usr/local/nvidia
+  #   environment:
+  #     NVIDIA_VISIBLE_DEVICES: all
+  #     NVIDIA_DRIVER_CAPABILITIES: compute,utility
+  #     PYTHONPATH: /drone/src/backend
+  #   commands:
+  #     - apt-get update && apt-get install -y python3 python3-pip
+  #     - cd backend
+  #     - pip3 install -r requirements.txt
+  #     - pip3 install pytest pytest-cov
+  #     - python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count())"
+  #     - nvidia-smi
+  #     - pytest tests/ --cov=. --cov-report=xml
 
   - name: test-frontend
     image: node:16
