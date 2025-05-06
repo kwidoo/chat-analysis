@@ -7,10 +7,10 @@ Interface Segregation Principle (I in SOLID).
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
-from interfaces.auth import IAuthService, IUserService, ITokenService, IMFAService
-from models.user import User
+from app.models.user import User
+from interfaces.auth import IAuthService, IMFAService, ITokenService, IUserService
 
 
 class AuthServiceImpl(IAuthService):

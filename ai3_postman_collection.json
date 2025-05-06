@@ -1,0 +1,616 @@
+{
+    "info": {
+        "name": "AI3 API",
+        "description": "Collection for the AI3 API endpoints",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Authentication",
+            "item": [
+                {
+                    "name": "1.1 Register User",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"securepassword123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/register",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "register"
+                            ]
+                        },
+                        "description": "Register a new user account"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.2 Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"securepassword123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "Login with username and password"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.3 Verify MFA",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"mfa_token\": \"mfa_token_received_from_login\",\n  \"mfa_code\": \"123456\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/verify-mfa",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "verify-mfa"
+                            ]
+                        },
+                        "description": "Verify MFA code when MFA is enabled"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.4 Refresh Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/refresh",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "refresh"
+                            ]
+                        },
+                        "description": "Refresh access token using refresh token"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.5 Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/logout",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "logout"
+                            ]
+                        },
+                        "description": "Logout and invalidate refresh token"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.6 Get User Profile",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/me",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "me"
+                            ]
+                        },
+                        "description": "Get authenticated user profile"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.7 Enable MFA",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/enable-mfa",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "enable-mfa"
+                            ]
+                        },
+                        "description": "Enable multi-factor authentication for user"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.8 Get Roles (Admin Only)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/roles",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "roles"
+                            ]
+                        },
+                        "description": "Get available roles (requires admin privileges)"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "2. Search",
+            "item": [
+                {
+                    "name": "2.1 Search Documents",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"q\": \"search query text\",\n  \"k\": 5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/search",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "search"
+                            ]
+                        },
+                        "description": "Search for similar documents using FAISS"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2.2 Get Search Suggestions",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"input\": \"search query prefix\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/search/suggest",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "search",
+                                "suggest"
+                            ]
+                        },
+                        "description": "Get search query suggestions based on input"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2.3 Process Natural Language Query",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"query\": \"find recent documents about machine learning\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/search/process-nl",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "search",
+                                "process-nl"
+                            ]
+                        },
+                        "description": "Transform natural language into structured queries"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2.4 Get Visualization Data",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/search/visualization",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "search",
+                                "visualization"
+                            ]
+                        },
+                        "description": "Get data for visualizations (clusters, projections)"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "3. Files",
+            "item": [
+                {
+                    "name": "3.1 Upload Files",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "files",
+                                    "type": "file",
+                                    "src": []
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/files/upload",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "files",
+                                "upload"
+                            ]
+                        },
+                        "description": "Upload files for processing"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3.2 Check Task Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/files/status/{{taskId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "files",
+                                "status",
+                                "{{taskId}}"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "taskId",
+                                    "value": "task-id-here"
+                                }
+                            ]
+                        },
+                        "description": "Check status of file processing task"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3.3 List Tasks",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/files/tasks?limit=100&offset=0&status=completed",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "files",
+                                "tasks"
+                            ],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "100",
+                                    "description": "Maximum number of tasks to return"
+                                },
+                                {
+                                    "key": "offset",
+                                    "value": "0",
+                                    "description": "Number of tasks to skip"
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "completed",
+                                    "description": "Filter by status"
+                                }
+                            ]
+                        },
+                        "description": "List all tasks with pagination and filtering"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "4. Models",
+            "item": [
+                {
+                    "name": "4.1 List Models",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/models/list",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "models",
+                                "list"
+                            ]
+                        },
+                        "description": "List all available models and active model"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "4.2 Switch Model",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/models/switch/{{version}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "models",
+                                "switch",
+                                "{{version}}"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "version",
+                                    "value": "model_v2"
+                                }
+                            ]
+                        },
+                        "description": "Switch to a different embedding model version"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "5. System",
+            "item": [
+                {
+                    "name": "5.1 Health Check",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/api/health",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "health"
+                            ]
+                        },
+                        "description": "Check system health status"
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{accessToken}}",
+                "type": "string"
+            }
+        ]
+    },
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    "// Check if access token is expired and refresh if needed",
+                    "const tokenExpiresAt = pm.environment.get(\"tokenExpiresAt\");",
+                    "",
+                    "if (tokenExpiresAt && new Date().getTime() > parseInt(tokenExpiresAt)) {",
+                    "    pm.sendRequest({",
+                    "        url: pm.environment.get(\"baseUrl\") + '/api/auth/refresh',",
+                    "        method: 'POST',",
+                    "        header: {",
+                    "            'Content-Type': 'application/json'",
+                    "        },",
+                    "        body: {",
+                    "            mode: 'raw',",
+                    "            raw: JSON.stringify({",
+                    "                refresh_token: pm.environment.get(\"refreshToken\")",
+                    "            })",
+                    "        }",
+                    "    }, function (err, res) {",
+                    "        if (!err && res.code === 200) {",
+                    "            const responseBody = res.json();",
+                    "            pm.environment.set(\"accessToken\", responseBody.access_token);",
+                    "            pm.environment.set(\"refreshToken\", responseBody.refresh_token);",
+                    "            ",
+                    "            // Set token expiration time (typically 15 minutes from now)",
+                    "            const expiresIn = responseBody.expires_in || 900; // default 15 minutes",
+                    "            pm.environment.set(\"tokenExpiresAt\", new Date().getTime() + expiresIn * 1000);",
+                    "        }",
+                    "    });",
+                    "}"
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:5000",
+            "type": "string"
+        }
+    ]
+}
