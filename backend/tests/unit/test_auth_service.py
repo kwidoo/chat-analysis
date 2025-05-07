@@ -1,7 +1,7 @@
 import time
 
 import pytest
-from services.auth_service import AuthService
+from services.default_auth_service import AuthService
 
 
 class TestAuthService:

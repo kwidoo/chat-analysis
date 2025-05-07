@@ -1,10 +1,8 @@
-import pytest
-import numpy as np
 import os
-from services.embedding_service import (
-    SentenceTransformerEmbeddingService,
-    ModelRegistry,
-)
+
+import numpy as np
+import pytest
+from services.default_embedding_service import ModelRegistry, SentenceTransformerEmbeddingService
 
 
 class TestEmbeddingService:

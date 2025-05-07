@@ -2,7 +2,7 @@ import os
 import numpy as np
 import faiss
 import threading
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, Tuple, Optional
 from services.interfaces import IndexServiceInterface
 
 

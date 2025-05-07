@@ -1,12 +1,9 @@
 import os
 import shutil
 import tempfile
-import threading
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import faiss
-import git
 import numpy as np
 import pytest
 from services.distributed_indexer import DaskDistributedIndexer

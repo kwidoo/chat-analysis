@@ -5,13 +5,12 @@ These tests show how our interfaces can be substituted with mock implementations
 adhering to the Liskov Substitution Principle (L in SOLID).
 """
 
-import pytest
 import datetime
-from typing import Dict, List, Any, Optional
-from unittest import mock
+from typing import Any, Dict, List, Optional
 
-from interfaces.auth import ITokenService, IMFAService, IUserService
-from services.impl.auth_service import AuthServiceImpl
+import pytest
+from interfaces.auth import IMFAService, ITokenService, IUserService
+from services.default_auth_service import AuthServiceImpl
 
 
 class MockTokenService(ITokenService):

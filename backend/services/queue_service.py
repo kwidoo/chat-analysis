@@ -1,8 +1,9 @@
 import os
-import queue
 import pickle
+import queue
 import threading
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, Optional
+
 from services.interfaces import QueueServiceInterface
 
 

@@ -1,9 +1,7 @@
 from datetime import datetime
+from flask import Blueprint, current_app, jsonify, request
 
-from flask import current_app, jsonify, request
-
-from . import files_bp
-
+files_bp = Blueprint("files", __name__)
 
 @files_bp.route("/upload", methods=["POST"])
 def upload_files():

@@ -2,8 +2,8 @@ import sys
 
 import alembic.config
 import click
-from db.session import db
-from flask import Flask
+from db.session import db_manager  # 👈 теперь только db_manager
+from flask import Flask, current_app
 from flask.cli import with_appcontext
 
 
@@ -20,7 +20,8 @@ def register_commands(app: Flask):
     def init_db():
         """Initialize the database and create tables."""
         try:
-            db.create_all()
+            db_manager.init_app(app)  # 👈 явная инициализация
+            db_manager.db.create_all()  # 👈 безопасное использование
             click.echo("Database initialized and tables created.")
         except Exception as e:
             click.echo(f"Error initializing database: {str(e)}", err=True)
@@ -32,13 +33,9 @@ def register_commands(app: Flask):
     def upgrade_db(revision):
         """Upgrade the database to the latest migration."""
         try:
-            # Use alembic config directly for more reliable migrations
             config = alembic.config.Config("alembic.ini")
-
-            # Run the migration
             args = ["upgrade", revision]
             alembic.config.main(argv=args, config=config)
-
             click.echo(f"Successfully upgraded database to revision: {revision}")
         except Exception as e:
             click.echo(f"Error upgrading database: {str(e)}", err=True)
@@ -79,15 +76,14 @@ def register_commands(app: Flask):
         from models.user import Role
 
         try:
-            with app.app_context():
-                # Check if roles already exist
-                roles = db.session.query(Role).all()
-                if roles:
-                    click.echo(f"Found {len(roles)} existing roles.")
+            db_manager.init_app(app)
+            session = db_manager.get_session()
+            roles = session.query(Role).all()
+            if roles:
+                click.echo(f"Found {len(roles)} existing roles.")
 
-                # Create default roles
-                app.auth_service.create_default_roles()
-                click.echo("Default roles created successfully.")
+            current_app.auth_service.create_default_roles()
+            click.echo("Default roles created successfully.")
         except Exception as e:
             click.echo(f"Error creating roles: {str(e)}", err=True)
             sys.exit(1)
@@ -99,20 +95,21 @@ def register_commands(app: Flask):
     def create_admin(username, password):
         """Create admin user in the database."""
         try:
-            with app.app_context():
-                # Use provided credentials or default from config
-                admin_username = username or app.config.get("ADMIN_USERNAME", "admin")
-                admin_password = password or app.config.get("ADMIN_PASSWORD", "admin")
+            db_manager.init_app(app)
+            admin_username = username or current_app.config.get(
+                "ADMIN_USERNAME", "admin@example.com"
+            )
+            admin_password = password or current_app.config.get("ADMIN_PASSWORD", "admin")
 
-                try:
-                    app.auth_service.create_user(
-                        username=admin_username,
-                        password=admin_password,
-                        roles=["admin"],
-                    )
-                    click.echo(f"Admin user '{admin_username}' created successfully.")
-                except ValueError as e:
-                    click.echo(f"Note: {str(e)}")
+            try:
+                current_app.auth_service.create_user(
+                    username=admin_username,
+                    password=admin_password,
+                    roles=["admin"],
+                )
+                click.echo(f"Admin user '{admin_username}' created successfully.")
+            except ValueError as e:
+                click.echo(f"Note: {str(e)}")
         except Exception as e:
             click.echo(f"Error creating admin user: {str(e)}", err=True)
             sys.exit(1)

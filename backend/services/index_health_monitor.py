@@ -1,14 +1,15 @@
-import os
-import time
-import logging
-import numpy as np
-import faiss
-import threading
-import psutil
 import json
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+import logging
+import os
+import threading
+import time
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import faiss
+import numpy as np
+import psutil
 
 logger = logging.getLogger(__name__)
 

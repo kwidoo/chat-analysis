@@ -1,39 +1,37 @@
 #!/bin/bash
 set -e
 
-# Ensure Python can find our modules
+# Ensure Python can find backend modules
 export PYTHONPATH=/app:$PYTHONPATH
+export FLASK_APP="app:app"
 
-# Wait for potential database to be ready (especially important if using MySQL)
-if [ "$DB_TYPE" = "mysql" ]; then
-    echo "Waiting for database to be ready..."
+# Wait for DB if needed
+if [ "$DB_TYPE" = "mysql" ] || [ "$DB_TYPE" = "mariadb" ]; then
+    echo "Waiting for database at $DB_HOST:$DB_PORT..."
     MAX_RETRIES=30
     RETRY_INTERVAL=2
     retries=0
-
-    while [ $retries -lt $MAX_RETRIES ]; do
-        if nc -z -w1 $DB_HOST $DB_PORT; then
-            echo "Database is ready!"
-            break
-        fi
-        echo "Waiting for database connection... ($((retries+1))/$MAX_RETRIES)"
+    until nc -z -w1 "$DB_HOST" "$DB_PORT" || [ $retries -eq $MAX_RETRIES ]; do
+        echo "  Retry $((retries+1))/$MAX_RETRIES: Waiting..."
         sleep $RETRY_INTERVAL
-        retries=$((retries+1))
+        retries=$((retries + 1))
     done
 
     if [ $retries -eq $MAX_RETRIES ]; then
-        echo "Could not connect to the database after $MAX_RETRIES attempts"
+        echo "❌ Failed to connect to database at $DB_HOST:$DB_PORT"
         exit 1
     fi
+
+    echo "✅ Database is ready!"
 fi
 
-# Run database migrations using the custom CLI commands
-echo "Running database migrations..."
-cd /app
-flask db_commands upgrade || (echo "Migration command failed. Will try to create tables directly."; FLASK_APP=app.py python -c "import sys; sys.path.insert(0, '/app'); from app import app; app.app_context().push(); from db.session import db; db.create_all()")
+# Run migrations
+echo "🚀 Running database migrations..."
+flask db-commands upgrade || {
+     echo "⚠️ Migration failed, attempting direct table creation..."
+     flask db-commands init
+}
 
-echo "Migrations completed successfully"
-
-# Execute the CMD
-echo "Starting application..."
+# Start the app
+echo "📦 Starting app..."
 exec "$@"

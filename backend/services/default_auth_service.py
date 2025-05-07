@@ -7,10 +7,94 @@ Interface Segregation Principle (I in SOLID).
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
+import jwt
+import pyotp
 from interfaces.auth import IAuthService, IMFAService, ITokenService, IUserService
 from models.user import User
+
+
+class MFAVerification(IMFAService):
+    """Implementation of the IMFAService interface for Multi-Factor Authentication."""
+
+    def __init__(self):
+        self.issuer_name = "AI3App"
+
+    def generate_mfa_secret(self, user_id: str) -> str:
+        """Generate a new MFA secret for a user."""
+        secret = pyotp.random_base32()
+        return secret
+
+    def get_mfa_provisioning_uri(self, user_id: str, secret: str) -> str:
+        """Generate a provisioning URI for the user's MFA setup."""
+        return pyotp.totp.TOTP(secret).provisioning_uri(name=user_id, issuer_name=self.issuer_name)
+
+    def verify_mfa_code(self, secret: str, code: str) -> bool:
+        """Verify the provided MFA code against the secret."""
+        totp = pyotp.TOTP(secret)
+        return totp.verify(code)
+
+
+class TokenService(ITokenService):
+    """Implementation of the ITokenService interface for JWT token management."""
+
+    def __init__(
+        self, secret_key: str, access_token_expiry: int = 15, refresh_token_expiry: int = 1440
+    ):
+        """Initialize the TokenService with secret key and token expiry durations."""
+        self.secret_key = secret_key
+        self.access_token_expiry = access_token_expiry  # in minutes
+        self.refresh_token_expiry = refresh_token_expiry  # in minutes
+
+    def generate_access_token(self, user_id: str) -> str:
+        """Generate a new access token for a user."""
+        payload = {
+            "sub": user_id,
+            "exp": datetime.utcnow() + timedelta(minutes=self.access_token_expiry),
+            "iat": datetime.utcnow(),
+        }
+        return jwt.encode(payload, self.secret_key, algorithm="HS256")
+
+    def generate_refresh_token(self, user_id: str) -> str:
+        """Generate a new refresh token for a user."""
+        payload = {
+            "sub": user_id,
+            "exp": datetime.utcnow() + timedelta(minutes=self.refresh_token_expiry),
+            "iat": datetime.utcnow(),
+        }
+        return jwt.encode(payload, self.secret_key, algorithm="HS256")
+
+    def validate_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
+        """Validate a token and return its payload if valid."""
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=["HS256"])
+            return payload
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.InvalidTokenError:
+            return None
+
+    def refresh_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
+        """Refresh an access token using a valid refresh token."""
+        payload = self.validate_token(refresh_token, token_type="refresh")
+        if not payload:
+            return None
+        user_id = payload.get("sub")
+        return {
+            "access_token": self.generate_access_token(user_id),
+            "refresh_token": self.generate_refresh_token(user_id),
+        }
+
+    def revoke_token(self, refresh_token: str) -> bool:
+        """Revoke a refresh token (not implemented in this example)."""
+        # Token revocation would require a persistent store to track revoked tokens.
+        return True
+
+    def clean_expired_tokens(self) -> None:
+        """Clean up expired tokens (not implemented in this example)."""
+        pass
 
 
 class AuthServiceImpl(IAuthService):

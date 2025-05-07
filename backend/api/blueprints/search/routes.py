@@ -1,6 +1,7 @@
 import numpy as np
-from flask import request, jsonify, current_app
-from . import search_bp
+from flask import Blueprint, current_app, jsonify, request
+
+search_bp = Blueprint("search", __name__)
 
 
 @search_bp.route("", methods=["POST"])

@@ -1,14 +1,10 @@
-import json
-import os
 import secrets
-import time
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List
 
 import requests
 from flask import Flask, redirect, request, session, url_for
 from pydantic import BaseModel
-
-from services.auth_service import AuthService, User
+from services.default_auth_service import AuthService, User
 
 
 class OAuthProvider(BaseModel):

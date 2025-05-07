@@ -50,7 +50,7 @@ RUN python -c "import torch; print('CUDA available:', torch.cuda.is_available())
 
 # Healthcheck
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+    CMD curl -f http://backend:5000/health || exit 1
 
 # Set active model
 ENV ACTIVE_MODEL=v1

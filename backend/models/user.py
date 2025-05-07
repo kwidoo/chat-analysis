@@ -14,6 +14,8 @@ user_roles = Table(
     db.Model.metadata,
     Column("user_id", String(36), ForeignKey("users.id")),
     Column("role_id", String(36), ForeignKey("roles.id")),
+    mysql_charset="utf8mb4",
+    mysql_collate="utf8mb4_unicode_ci",
 )
 
 
@@ -21,6 +23,10 @@ class Role(db.Model):
     """Role model for role-based access control."""
 
     __tablename__ = "roles"
+    __table_args__ = {
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(50), unique=True, nullable=False)
@@ -34,6 +40,10 @@ class RefreshToken(db.Model):
     """Model for storing refresh tokens."""
 
     __tablename__ = "refresh_tokens"
+    __table_args__ = {
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
 
     id = Column(String(36), primary_key=True)  # JWT ID (jti)
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
@@ -52,9 +62,13 @@ class User(db.Model):
     """User model for authentication and authorization."""
 
     __tablename__ = "users"
+    __table_args__ = {
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    email = Column(String(255), unique=True, nullable=False)
+    username = Column(String(255), unique=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -76,7 +90,7 @@ class User(db.Model):
     metadata_json = Column(MutableDict.as_mutable(JSON), default=dict)
 
     def __repr__(self):
-        return f"<User {self.email}>"
+        return f"<User {self.username}>"
 
     @property
     def role_names(self) -> List[str]:

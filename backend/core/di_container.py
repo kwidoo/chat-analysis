@@ -13,21 +13,15 @@ from interfaces.auth import IAuthService, IMFAService, ITokenService, IUserServi
 from interfaces.embedding import IEmbeddingService
 from interfaces.index import IIndexService
 from interfaces.message_broker import IMessageBroker
-from interfaces.queue import (
-    IFileProcessorConsumer,
-    IFileProcessorProducer,
-    IQueueService,
-)
-from services.embedding_service import ModelRegistry
-from services.impl.auth_service import AuthServiceImpl
-from services.impl.file_processor_consumer import SupervisorProcessImpl
-from services.impl.file_processor_producer import FileProcessorProducerImpl
-from services.impl.message_broker import RabbitMQConnectionPool
-from services.impl.mfa_service import TOTPMFAServiceImpl
-
-# Import service implementations
-from services.impl.token_service import JWTTokenServiceImpl
-from services.impl.user_service import UserServiceImpl
+from interfaces.queue import IFileProcessorConsumer, IFileProcessorProducer, IQueueService
+from services.default_auth_service import AuthServiceImpl
+from services.default_embedding_service import ModelRegistry
+from services.default_message_broker import RabbitMQConnectionPool
+from services.default_mfa_service import TOTPMFAServiceImpl
+from services.default_user_service import UserServiceImpl
+from services.file_processor_consumer import SupervisorProcessImpl
+from services.file_processor_producer import FileProcessorProducerImpl
+from services.token_service import JWTTokenServiceImpl
 
 
 class DIContainer:
@@ -139,7 +133,7 @@ class DIContainer:
     def _setup_embedding_service(self) -> None:
         """Set up embedding service"""
         # Get the default model version from config
-        default_model = self.app.config.get("DEFAULT_MODEL", "v1")
+        default_model = self.app.config.get("DEFAULT_MODEL", "v2")
 
         # Create embedding service
         embedding_service = ModelRegistry.get_embedding_service(default_model)

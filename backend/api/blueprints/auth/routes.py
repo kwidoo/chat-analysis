@@ -1,8 +1,9 @@
 import pyotp
-from api.blueprints.auth import auth_bp
-from flask import current_app, g, jsonify, request
-from services.auth_service import MFAVerification, UserCredentials
-from services.permission_middleware import requires_auth
+from flask import Blueprint, current_app, g, jsonify, request
+from services.default_mfa_service import TOTPMFAServiceImpl
+from services.default_permission_middleware import requires_auth
+
+auth_bp = Blueprint("auth", __name__)
 
 
 @auth_bp.route("/register", methods=["POST"])
@@ -10,12 +11,14 @@ def register():
     """Register a new user."""
     try:
         data = request.json
-        user_data = UserCredentials(**data)
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
 
         # Create user with the auth service
-        user = current_app.auth_service.create_user(
-            username=user_data.username, password=user_data.password
-        )
+        user = current_app.auth_service.create_user(username=username, password=password)
 
         # Generate tokens for the new user
         tokens = current_app.auth_service.generate_token_pair(user)
@@ -24,8 +27,8 @@ def register():
 
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception:
-        return jsonify({"error": "Registration failed"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Registration failed: {e}"}), 500
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -33,12 +36,14 @@ def login():
     """Authenticate a user and issue JWT tokens."""
     try:
         data = request.json
-        user_data = UserCredentials(**data)
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
 
         # Authenticate user
-        auth_result = current_app.auth_service.authenticate(
-            username=user_data.username, password=user_data.password
-        )
+        auth_result = current_app.auth_service.authenticate(username=username, password=password)
 
         if not auth_result:
             return jsonify({"error": "Invalid credentials"}), 401
@@ -59,8 +64,8 @@ def login():
         # No MFA required, return tokens
         return jsonify({"message": "Login successful", **auth_result})
 
-    except Exception:
-        return jsonify({"error": "Login failed"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Login error: {e}"}), 500
 
 
 @auth_bp.route("/verify-mfa", methods=["POST"])
@@ -68,12 +73,14 @@ def verify_mfa():
     """Validate MFA code and issue JWT tokens upon successful verification."""
     try:
         data = request.json
-        mfa_data = MFAVerification(**data)
+        mfa_token = data.get("mfa_token")
+        mfa_code = data.get("mfa_code")
+
+        if not mfa_token or not mfa_code:
+            return jsonify({"error": "MFA token and code are required"}), 400
 
         # Verify the MFA code
-        tokens = current_app.auth_service.verify_mfa(
-            mfa_token=mfa_data.mfa_token, mfa_code=mfa_data.mfa_code
-        )
+        tokens = current_app.auth_service.verify_mfa(mfa_token=mfa_token, mfa_code=mfa_code)
 
         if not tokens:
             return jsonify({"error": "Invalid or expired MFA code"}), 401
@@ -102,8 +109,8 @@ def refresh_token():
 
         return jsonify({"message": "Token refreshed successfully", **tokens})
 
-    except Exception:
-        return jsonify({"error": "Token refresh failed"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Token refresh failed: {e}"}), 500
 
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -124,8 +131,8 @@ def logout():
 
         return jsonify({"message": "Logged out successfully"})
 
-    except Exception:
-        return jsonify({"error": "Logout failed"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Logout failed: {e}"}), 500
 
 
 @auth_bp.route("/me", methods=["GET"])
@@ -140,10 +147,17 @@ def get_profile():
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        return jsonify({"id": user.id, "username": user.username, "roles": user.roles})
+        # Return user profile data
+        return jsonify(
+            {
+                "id": user.id,
+                "username": user.username,
+                "roles": user.role_names if hasattr(user, "role_names") else user.roles,
+            }
+        )
 
-    except Exception:
-        return jsonify({"error": "Failed to get user profile"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to get user profile: {str(e)}"}), 500
 
 
 @auth_bp.route("/enable-mfa", methods=["POST"])
@@ -169,8 +183,8 @@ def enable_mfa():
 
         return jsonify({"message": "MFA enabled successfully", "secret": secret, "uri": uri})
 
-    except Exception:
-        return jsonify({"error": "Failed to enable MFA"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to enable MFA: {str(e)}"}), 500
 
 
 @auth_bp.route("/roles", methods=["GET"])

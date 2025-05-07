@@ -2,14 +2,14 @@ from functools import wraps
 from typing import Callable, Dict, List, Optional, Set, Union
 
 import jwt
-from flask import Flask, Request, current_app, g, jsonify, request
-from services.auth_service import AuthService
+from flask import Flask, current_app, g, jsonify, request
+from services.default_auth_service import AuthServiceImpl
 
 
 class PermissionMiddleware:
     """Middleware for role-based access control using the AuthService."""
 
-    def __init__(self, auth_service: AuthService):
+    def __init__(self, auth_service: AuthServiceImpl):
         """
         Initialize the PermissionMiddleware with an AuthService.
 

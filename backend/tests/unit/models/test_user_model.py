@@ -16,32 +16,32 @@ class TestUserModel:
     def test_user_creation(self, db_session):
         """Test creating a new user"""
         # Create a user
-        user = User(email="test@example.com", hashed_password="hashed_password123", active=True)
+        user = User(username="test@example.com", hashed_password="hashed_password123", active=True)
         db_session.add(user)
         db_session.commit()
 
         # Retrieve the user
-        retrieved_user = db_session.query(User).filter_by(email="test@example.com").first()
+        retrieved_user = db_session.query(User).filter_by(username="test@example.com").first()
 
         # Verify user was created correctly
         assert retrieved_user is not None
-        assert retrieved_user.email == "test@example.com"
+        assert retrieved_user.username == "test@example.com"
         assert retrieved_user.hashed_password == "hashed_password123"
         assert retrieved_user.active is True
         assert retrieved_user.id is not None
 
-    def test_user_unique_email(self, db_session):
-        """Test that user email must be unique"""
+    def test_user_unique_username(self, db_session):
+        """Test that user username must be unique"""
         # Create initial user
-        user1 = User(email="duplicate@example.com", hashed_password="password1")
+        user1 = User(username="duplicate@example.com", hashed_password="password1")
         db_session.add(user1)
         db_session.commit()
 
-        # Try to create another user with the same email
-        user2 = User(email="duplicate@example.com", hashed_password="password2")
+        # Try to create another user with the same username
+        user2 = User(username="duplicate@example.com", hashed_password="password2")
         db_session.add(user2)
 
-        # Should raise an integrity error for duplicate email
+        # Should raise an integrity error for duplicate username
         with pytest.raises(IntegrityError):
             db_session.commit()
 
@@ -52,7 +52,7 @@ class TestUserModel:
         """Test user metadata_json field"""
         # Create user with metadata
         user = User(
-            email="metadata@example.com",
+            username="metadata@example.com",
             hashed_password="password",
             metadata_json={"preferences": {"theme": "dark", "notifications": True}},
         )
@@ -60,7 +60,7 @@ class TestUserModel:
         db_session.commit()
 
         # Retrieve and verify metadata
-        retrieved_user = db_session.query(User).filter_by(email="metadata@example.com").first()
+        retrieved_user = db_session.query(User).filter_by(username="metadata@example.com").first()
         assert retrieved_user.metadata_json["preferences"]["theme"] == "dark"
         assert retrieved_user.metadata_json["preferences"]["notifications"] is True
 
@@ -69,7 +69,7 @@ class TestUserModel:
         db_session.commit()
 
         # Verify update
-        updated_user = db_session.query(User).filter_by(email="metadata@example.com").first()
+        updated_user = db_session.query(User).filter_by(username="metadata@example.com").first()
         assert updated_user.metadata_json["preferences"]["theme"] == "light"
 
 
@@ -103,7 +103,7 @@ class TestRoleAssignment:
         db_session.commit()
 
         # Create user
-        user = User(email="roletest@example.com", hashed_password="password")
+        user = User(username="roletest@example.com", hashed_password="password")
 
         # Assign roles to user
         user.roles.append(admin_role)
@@ -112,7 +112,7 @@ class TestRoleAssignment:
         db_session.commit()
 
         # Verify user has the correct roles
-        retrieved_user = db_session.query(User).filter_by(email="roletest@example.com").first()
+        retrieved_user = db_session.query(User).filter_by(username="roletest@example.com").first()
         assert len(retrieved_user.roles) == 2
         role_names = [role.name for role in retrieved_user.roles]
         assert "admin" in role_names
@@ -127,14 +127,14 @@ class TestRoleAssignment:
         db_session.commit()
 
         # Create user with roles
-        user = User(email="propertiestest@example.com", hashed_password="password")
+        user = User(username="propertiestest@example.com", hashed_password="password")
         user.roles.append(admin_role)
         db_session.add(user)
         db_session.commit()
 
         # Test role_names property
         retrieved_user = (
-            db_session.query(User).filter_by(email="propertiestest@example.com").first()
+            db_session.query(User).filter_by(username="propertiestest@example.com").first()
         )
         assert "admin" in retrieved_user.role_names
         assert "user" not in retrieved_user.role_names
@@ -148,13 +148,13 @@ class TestRoleAssignment:
         db_session.commit()
 
         # Create user with roles
-        user = User(email="hasrole@example.com", hashed_password="password")
+        user = User(username="hasrole@example.com", hashed_password="password")
         user.roles.append(user_role)  # Only add user role, not admin
         db_session.add(user)
         db_session.commit()
 
         # Test has_role method
-        retrieved_user = db_session.query(User).filter_by(email="hasrole@example.com").first()
+        retrieved_user = db_session.query(User).filter_by(username="hasrole@example.com").first()
         assert retrieved_user.has_role("user") is True
         assert (
             retrieved_user.has_role("admin") is False
@@ -167,7 +167,7 @@ class TestRefreshToken:
     def test_refresh_token_creation(self, db_session):
         """Test creating a refresh token for a user"""
         # Create user
-        user = User(email="tokentest@example.com", hashed_password="password")
+        user = User(username="tokentest@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 
@@ -187,7 +187,7 @@ class TestRefreshToken:
     def test_token_relationship(self, db_session):
         """Test the relationship between users and refresh tokens"""
         # Create user
-        user = User(email="relationship@example.com", hashed_password="password")
+        user = User(username="relationship@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 
@@ -206,17 +206,19 @@ class TestRefreshToken:
         db_session.commit()
 
         # Verify relationships
-        retrieved_user = db_session.query(User).filter_by(email="relationship@example.com").first()
+        retrieved_user = (
+            db_session.query(User).filter_by(username="relationship@example.com").first()
+        )
         assert len(retrieved_user.refresh_tokens) == 2
 
         # Test retrieving the user from the token
         retrieved_token = db_session.query(RefreshToken).filter_by(id=token1.id).first()
-        assert retrieved_token.user.email == "relationship@example.com"
+        assert retrieved_token.user.username == "relationship@example.com"
 
     def test_revoke_token(self, db_session):
         """Test revoking a refresh token"""
         # Create user
-        user = User(email="revoke@example.com", hashed_password="password")
+        user = User(username="revoke@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 
@@ -241,7 +243,7 @@ class TestRefreshToken:
     def test_cascade_delete(self, db_session):
         """Test that deleting a user cascades to its refresh tokens"""
         # Create user
-        user = User(email="cascade@example.com", hashed_password="password")
+        user = User(username="cascade@example.com", hashed_password="password")
         db_session.add(user)
         db_session.commit()
 

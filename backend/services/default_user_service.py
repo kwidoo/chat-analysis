@@ -6,13 +6,13 @@ managing user accounts, authentication and role management.
 """
 
 import logging
-import bcrypt
-from typing import Dict, Any, List, Optional
-from sqlalchemy.orm.exc import NoResultFound
+from typing import Any, Dict, List, Optional
 
-from interfaces.auth import IUserService, ITokenService, IMFAService
+import bcrypt
 from db.session import db
+from interfaces.auth import IMFAService, ITokenService, IUserService
 from models.user import User
+from sqlalchemy.orm.exc import NoResultFound
 
 
 class UserServiceImpl(IUserService):

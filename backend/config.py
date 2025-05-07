@@ -2,9 +2,12 @@
 import os
 import secrets
 import urllib.parse
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, validator
+
+load_dotenv()
 
 
 class AppConfig(BaseModel):
@@ -28,9 +31,6 @@ class AppConfig(BaseModel):
     RABBITMQ_USER: str
     RABBITMQ_PASSWORD: str
     RABBITMQ_VHOST: str
-    RABBITMQ_CONNECTION_ATTEMPTS: int
-    RABBITMQ_RETRY_DELAY: int
-    RABBITMQ_MAX_CONNECTIONS: int
 
     # Database Configuration
     DB_TYPE: str = "sqlite"  # sqlite or mysql
@@ -48,15 +48,9 @@ class AppConfig(BaseModel):
     SECRET_KEY: Optional[str] = None
     JWT_ACCESS_TOKEN_EXPIRES: int = 3600  # 1 hour
     JWT_REFRESH_TOKEN_EXPIRES: int = 604800  # 7 days
-    OAUTH_ENABLED: bool = False
-    GOOGLE_CLIENT_ID: Optional[str] = None
-    GOOGLE_CLIENT_SECRET: Optional[str] = None
-    GITHUB_CLIENT_ID: Optional[str] = None
-    GITHUB_CLIENT_SECRET: Optional[str] = None
     SESSION_TYPE: str = "filesystem"
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080"]
 
     @validator("ACTIVE_MODEL")
     def validate_active_model(cls, v):
@@ -75,57 +69,48 @@ class Config:
     """Base configuration class - defines defaults and structure"""
 
     APP_DIR = os.path.dirname(__file__)
-    DATA_DIR = os.path.join(APP_DIR, "faiss")
-    UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
-    DASK_SCHEDULER_ADDRESS = "tcp://dask-scheduler:8786"  # Default for containers
-    FAISS_DIR = os.path.join(APP_DIR, "faiss")
-    FAISS_LOCK_FILE = os.path.join(FAISS_DIR, "index.lock")
-    MODELS_DIR = os.path.join(APP_DIR, "models")
-    QUEUES_DIR = os.path.join(APP_DIR, "queues")
-    ACTIVE_MODEL = "v1"  # Default
+    DATA_DIR = os.getenv("DATA_DIR", os.path.join(APP_DIR, "faiss"))
+    UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.join(APP_DIR, "uploads"))
+    DASK_SCHEDULER_ADDRESS = os.getenv("DASK_SCHEDULER_ADDRESS", "tcp://dask-scheduler:8786")
+    FAISS_DIR = os.getenv("FAISS_DIR", os.path.join(APP_DIR, "faiss"))
+    FAISS_LOCK_FILE = os.getenv("FAISS_LOCK_FILE", os.path.join(FAISS_DIR, "index.lock"))
+    MODELS_DIR = os.getenv("MODELS_DIR", os.path.join(APP_DIR, "models"))
+    QUEUES_DIR = os.getenv("QUEUES_DIR", os.path.join(APP_DIR, "queues"))
+    ACTIVE_MODEL = os.getenv("ACTIVE_MODEL", "v1")
 
     # Memory management
-    MEMORY_LIMIT = "4GB"
-    GC_INTERVAL = 300
+    MEMORY_LIMIT = os.getenv("MEMORY_LIMIT", "4GB")
+    GC_INTERVAL = int(os.getenv("GC_INTERVAL", 300))
 
     # Queue monitoring
     QUEUE_STATUS = {"total": 0, "processed": 0, "failed": 0}
 
-    # Default RabbitMQ settings (will be overridden by get_config_object logic)
-    RABBITMQ_HOST = "localhost"
-    RABBITMQ_PORT = 5672
-    RABBITMQ_USER = "guest"
-    RABBITMQ_PASSWORD = "guest"
-    RABBITMQ_VHOST = "/"
-    RABBITMQ_CONNECTION_ATTEMPTS = 5
-    RABBITMQ_RETRY_DELAY = 5
-    RABBITMQ_MAX_CONNECTIONS = 10
+    # RabbitMQ settings
+    RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
+    RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", 5672))
+    RABBITMQ_USER = os.getenv("RABBITMQ_USER", "guest")
+    RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "guest")
+    RABBITMQ_VHOST = os.getenv("RABBITMQ_VHOST", "/")
 
     # Database Configuration Defaults
-    DB_TYPE = "sqlite"
-    DB_PATH = os.path.join(APP_DIR, "auth.db")
-    DB_HOST = "localhost"
-    DB_PORT = 3306
-    DB_USERNAME = "root"
-    DB_PASSWORD = ""
-    DB_DATABASE = "ai3_auth"
-    DB_POOL_SIZE = 10
-    DB_MAX_OVERFLOW = 20
-    DB_POOL_RECYCLE = 3600
+    DB_TYPE = os.getenv("DB_TYPE", "mariadb")
+    DB_PATH = os.getenv("DB_PATH", os.path.join(APP_DIR, "auth.db"))
+    DB_HOST = os.getenv("DB_HOST", "database")
+    DB_PORT = int(os.getenv("DB_PORT", 3306))
+    DB_USERNAME = os.getenv("DB_USERNAME", "root")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+    DB_DATABASE = os.getenv("DB_DATABASE", "ai3_auth")
+    DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", 10))
+    DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", 20))
+    DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", 3600))
 
     # Authentication System Configuration Defaults
-    SECRET_KEY = None
-    JWT_ACCESS_TOKEN_EXPIRES = 3600
-    JWT_REFRESH_TOKEN_EXPIRES = 604800
-    OAUTH_ENABLED = False
-    GOOGLE_CLIENT_ID = None
-    GOOGLE_CLIENT_SECRET = None
-    GITHUB_CLIENT_ID = None
-    GITHUB_CLIENT_SECRET = None
-    SESSION_TYPE = "filesystem"
-    ADMIN_USERNAME = "admin"
-    ADMIN_PASSWORD = "admin"
-    CORS_ORIGINS = ["http://localhost:3000", "http://localhost:8080"]
+    SECRET_KEY = os.getenv("SECRET_KEY", None)
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 3600))
+    JWT_REFRESH_TOKEN_EXPIRES = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", 604800))
+    SESSION_TYPE = os.getenv("SESSION_TYPE", "filesystem")
+    ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 
     @staticmethod
     def init_app(app):
@@ -157,8 +142,7 @@ class DevelopmentConfig(Config):
     TESTING = False
     MEMORY_LIMIT = "2GB"
     SECRET_KEY = "dev-secret-key"  # Override default
-    OAUTH_ENABLED = True  # Override default
-    DB_TYPE = "sqlite"  # Use SQLite for development
+    DB_TYPE = "mysql"  # Use SQLite for development
     DB_PATH = os.path.join(Config.APP_DIR, "dev_auth.db")
 
 
@@ -293,19 +277,6 @@ def get_config_object(config_name: Optional[str] = None) -> Config:
             "RABBITMQ_VHOST", config_instance.RABBITMQ_VHOST
         )
 
-    config_instance.RABBITMQ_CONNECTION_ATTEMPTS = int(
-        os.environ.get(
-            "RABBITMQ_CONNECTION_ATTEMPTS",
-            config_instance.RABBITMQ_CONNECTION_ATTEMPTS,
-        )
-    )
-    config_instance.RABBITMQ_RETRY_DELAY = int(
-        os.environ.get("RABBITMQ_RETRY_DELAY", config_instance.RABBITMQ_RETRY_DELAY)
-    )
-    config_instance.RABBITMQ_MAX_CONNECTIONS = int(
-        os.environ.get("RABBITMQ_MAX_CONNECTIONS", config_instance.RABBITMQ_MAX_CONNECTIONS)
-    )
-
     # Authentication
     # Use secrets.token_hex only if SECRET_KEY
     # is not set by env var *and* not overridden by subclass
@@ -322,24 +293,6 @@ def get_config_object(config_name: Optional[str] = None) -> Config:
     config_instance.JWT_REFRESH_TOKEN_EXPIRES = int(
         os.environ.get("JWT_REFRESH_TOKEN_EXPIRES", config_instance.JWT_REFRESH_TOKEN_EXPIRES)
     )
-    # Handle boolean conversion carefully for OAUTH_ENABLED
-    oauth_env = os.environ.get("OAUTH_ENABLED")
-    if oauth_env is not None:
-        config_instance.OAUTH_ENABLED = oauth_env.lower() in ("true", "1", "t")
-    # else: it keeps the value from the ConfigClass instance
-
-    config_instance.GOOGLE_CLIENT_ID = os.environ.get(
-        "GOOGLE_CLIENT_ID", config_instance.GOOGLE_CLIENT_ID
-    )
-    config_instance.GOOGLE_CLIENT_SECRET = os.environ.get(
-        "GOOGLE_CLIENT_SECRET", config_instance.GOOGLE_CLIENT_SECRET
-    )
-    config_instance.GITHUB_CLIENT_ID = os.environ.get(
-        "GITHUB_CLIENT_ID", config_instance.GITHUB_CLIENT_ID
-    )
-    config_instance.GITHUB_CLIENT_SECRET = os.environ.get(
-        "GITHUB_CLIENT_SECRET", config_instance.GITHUB_CLIENT_SECRET
-    )
     config_instance.SESSION_TYPE = os.environ.get("SESSION_TYPE", config_instance.SESSION_TYPE)
     config_instance.ADMIN_USERNAME = os.environ.get(
         "ADMIN_USERNAME", config_instance.ADMIN_USERNAME
@@ -347,9 +300,6 @@ def get_config_object(config_name: Optional[str] = None) -> Config:
     config_instance.ADMIN_PASSWORD = os.environ.get(
         "ADMIN_PASSWORD", config_instance.ADMIN_PASSWORD
     )
-    config_instance.CORS_ORIGINS = os.environ.get(
-        "CORS_ORIGINS", ",".join(config_instance.CORS_ORIGINS)
-    ).split(",")
 
     # --- Validate Config ---
     # Convert instance attributes to dict for Pydantic validation
@@ -362,8 +312,6 @@ def get_config_object(config_name: Optional[str] = None) -> Config:
     try:
         AppConfig(**config_dict)  # Validate against AppConfig model
         print(f"Configuration loaded successfully for '{config_name}':")
-        # print(f"  RABBITMQ_HOST: {config_instance.RABBITMQ_HOST}") # Debug print
-        # print(f"  RABBITMQ_PORT: {config_instance.RABBITMQ_PORT}") # Debug print
     except Exception as e:
         print(f"Configuration validation failed for {config_name} ({ConfigClass.__name__})")
         print(f"Config dictionary provided for validation: {config_dict}")

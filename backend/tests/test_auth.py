@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import jwt
 import pytest
-from models.user import Role, User
+from app.models.user import Role, User
 
 
 def test_user_registration(client, db_session):
@@ -18,13 +18,13 @@ def test_user_registration(client, db_session):
     assert "user_id" in data
 
     # Verify user was created in database
-    user = db_session.query(User).filter_by(email="newuser@example.com").first()
+    user = db_session.query(User).filter_by(username="newuser@example.com").first()
     assert user is not None
     assert user.active is True
 
 
 def test_user_registration_duplicate(client, db_session, test_user):
-    """Test registering with an existing email fails"""
+    """Test registering with an existing username fails"""
     response = client.post(
         "/api/auth/register",
         json={"username": "testuser@example.com", "password": "password123"},

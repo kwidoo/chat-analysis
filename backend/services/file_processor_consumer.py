@@ -1,448 +1,248 @@
-import json
-import logging
+"""
+File Processor Consumer Implementation
+
+This module provides an implementation of the IFileProcessorConsumer interface
+for consuming file processing tasks from a queue.
+"""
+
 import os
-import threading
+import json
 import time
+import logging
+import threading
 import traceback
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Dict, Any, List
 
-from services.embedding_service import EmbeddingServiceInterface
-from services.file_processor_producer import FILE_PROCESSING_QUEUE, TASK_TRACKING_QUEUE
-from services.index_service import IndexServiceInterface
-from services.message_broker import MessageBrokerInterface
-
-logger = logging.getLogger(__name__)
+from interfaces.queue import IFileProcessorConsumer
+from interfaces.embedding import IEmbeddingService
+from interfaces.index import IIndexService
+from interfaces.message_broker import IMessageBroker
 
 
-class CircuitBreaker:
-    """Circuit breaker pattern implementation for error handling"""
-
-    def __init__(self, failure_threshold: int = 5, reset_timeout: int = 60):
-        """Initialize the circuit breaker
-
-        Args:
-            failure_threshold: Number of failures before opening the circuit
-            reset_timeout: Time in seconds before attempting to close the circuit
-        """
-        self.failure_count = 0
-        self.failure_threshold = failure_threshold
-        self.reset_timeout = reset_timeout
-        self.state = "CLOSED"
-        self.last_failure_time = None
-        self._lock = threading.RLock()
-
-    def execute(self, func: Callable, *args, **kwargs):
-        """Execute a function with circuit breaker protection
-
-        Args:
-            func: Function to execute
-            *args: Function arguments
-            **kwargs: Function keyword arguments
-
-        Returns:
-            Result of the function or raises an exception
-
-        Raises:
-            CircuitBreakerOpenError: If the circuit is open
-            Exception: Any exception raised by the function
-        """
-        with self._lock:
-            if self.state == "OPEN":
-                # Check if reset timeout has elapsed
-                if (
-                    self.last_failure_time
-                    and time.time() - self.last_failure_time >= self.reset_timeout
-                ):
-                    logger.info("Circuit breaker reset timeout elapsed, moving to half-open state")
-                    self.state = "HALF-OPEN"
-                else:
-                    raise CircuitBreakerOpenError("Circuit breaker is open")
-
-            try:
-                result = func(*args, **kwargs)
-
-                # If successful and in half-open state, close the circuit
-                if self.state == "HALF-OPEN":
-                    logger.info("Circuit breaker operation successful, closing circuit")
-                    self.state = "CLOSED"
-                    self.failure_count = 0
-
-                return result
-
-            except Exception as e:
-                self.last_failure_time = time.time()
-                self.failure_count += 1
-
-                if self.failure_count >= self.failure_threshold:
-                    logger.warning(
-                        f"Circuit breaker threshold reached ({self.failure_count} failures), "
-                        f"opening circuit"
-                    )
-                    self.state = "OPEN"
-
-                raise e
-
-
-class CircuitBreakerOpenError(Exception):
-    """Exception raised when the circuit breaker is open"""
-
-    pass
-
-
-class RetryPolicy:
-    """Retry policy for handling transient failures"""
+class SupervisorProcessImpl(IFileProcessorConsumer):
+    """Implementation of the file processor consumer interface"""
 
     def __init__(
         self,
-        max_retries: int = 3,
-        retry_delay: int = 5,
-        backoff_factor: float = 1.5,
-        max_delay: int = 60,
-    ):
-        """Initialize the retry policy
-
-        Args:
-            max_retries: Maximum number of retries
-            retry_delay: Initial delay between retries in seconds
-            backoff_factor: Factor to increase delay by after each retry
-            max_delay: Maximum delay between retries in seconds
-        """
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-        self.backoff_factor = backoff_factor
-        self.max_delay = max_delay
-
-    def execute(self, func: Callable, *args, **kwargs):
-        """Execute a function with retry policy
-
-        Args:
-            func: Function to execute
-            *args: Function arguments
-            **kwargs: Function keyword arguments
-
-        Returns:
-            Result of the function or raises an exception
-
-        Raises:
-            Exception: After max retries or non-retryable exception
-        """
-        retries = 0
-        delay = self.retry_delay
-
-        while True:
-            try:
-                return func(*args, **kwargs)
-            except CircuitBreakerOpenError:
-                # Don't retry if circuit breaker is open
-                raise
-            except Exception as e:
-                retries += 1
-
-                # Check if we should retry
-                if retries > self.max_retries:
-                    logger.error(f"Max retries ({self.max_retries}) exceeded: {e}")
-                    raise
-
-                logger.warning(
-                    f"Retry {retries}/{self.max_retries} after error: {e}. Waiting {delay}s"
-                )
-                time.sleep(delay)
-
-                # Increase delay for next retry
-                delay = min(delay * self.backoff_factor, self.max_delay)
-
-
-class FileProcessorConsumer:
-    """Consumer service for file processing tasks
-
-    This service consumes file processing tasks from the queue and processes them.
-    """
-
-    def __init__(
-        self,
-        broker: MessageBrokerInterface,
-        embedding_service: EmbeddingServiceInterface,
-        index_service: IndexServiceInterface,
+        message_broker: IMessageBroker,
+        embedding_service: IEmbeddingService,
+        index_service: IIndexService,
         task_store_dir: str,
-        prefetch: int = 1,
+        worker_count: int = 3,
     ):
         """Initialize the file processor consumer
 
         Args:
-            broker: Message broker for queue operations
-            embedding_service: Service for generating embeddings
-            index_service: Service for storing embeddings
-            task_store_dir: Directory to store task status
-            prefetch: Number of messages to prefetch
+            message_broker: The message broker for receiving messages
+            embedding_service: The embedding service for generating embeddings
+            index_service: The index service for storing embeddings
+            task_store_dir: Directory to store task information
+            worker_count: Number of worker threads to use
         """
-        self.broker = broker
-        self.embedding_service = embedding_service
-        self.index_service = index_service
-        self.task_store_dir = task_store_dir
-        self.prefetch = prefetch
-        self.circuit_breaker = CircuitBreaker()
-        self.retry_policy = RetryPolicy()
-        self.running = False
-        self.thread = None
-
-        os.makedirs(task_store_dir, exist_ok=True)
-
-    def start(self) -> None:
-        """Start the consumer thread"""
-        if self.running:
-            return
-
-        self.running = True
-        self.thread = threading.Thread(target=self._consume_tasks)
-        self.thread.daemon = True
-        self.thread.start()
-        logger.info("File processor consumer started")
-
-    def stop(self) -> None:
-        """Stop the consumer thread"""
-        self.running = False
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=5.0)
-        logger.info("File processor consumer stopped")
-
-    def _consume_tasks(self) -> None:
-        """Start consuming tasks from the queue"""
-        try:
-            self.broker.consume(FILE_PROCESSING_QUEUE, self._process_task, self.prefetch)
-        except Exception as e:
-            logger.error(f"Error in consumer: {e}")
-            self.running = False
-
-    def _process_task(self, message: Dict[str, Any]) -> None:
-        """Process a task from the queue
-
-        Args:
-            message: Task message from the queue
-        """
-        task_id = message.get("task_id")
-        if not task_id:
-            logger.error("Received task without task_id")
-            return
-
-        # Update task status to processing
-        self._update_task_status(task_id, "processing")
-
-        try:
-            # Extract data from message
-            file_path = message.get("file_path")
-            file_content = message.get("file_content")
-            metadata = message.get("metadata", {})
-
-            if not file_path or not file_content:
-                raise ValueError("Missing file path or content in message")
-
-            # Process the file with circuit breaker and retry protection
-            self.retry_policy.execute(
-                self.circuit_breaker.execute,
-                self._extract_and_index_embeddings,
-                file_path,
-                file_content,
-                metadata,
-            )
-
-            # Update task status to completed
-            self._update_task_status(
-                task_id,
-                "completed",
-                {"processing_time": datetime.now().isoformat(), "success": True},
-            )
-
-        except Exception as e:
-            logger.error(f"Error processing task {task_id}: {e}\n{traceback.format_exc()}")
-
-            # Update task status to failed
-            self._update_task_status(
-                task_id,
-                "failed",
-                {"error": str(e), "traceback": traceback.format_exc()},
-            )
-
-    def _extract_and_index_embeddings(
-        self, file_path: str, file_content: str, metadata: Dict[str, Any]
-    ) -> None:
-        """Extract and index embeddings from a file
-
-        Args:
-            file_path: Path to the file
-            file_content: Content of the file
-            metadata: Additional metadata about the file
-        """
-        # Parse content based on file type
-        file_ext = os.path.splitext(file_path)[1].lower()
-
-        messages = []
-        try:
-            if file_ext == ".json":
-                # Parse JSON file
-                data = json.loads(file_content)
-
-                # Extract messages from JSON
-                if "messages" in data:
-                    messages = [
-                        msg.get("content", "") for msg in data["messages"] if "content" in msg
-                    ]
-                elif "text" in data:
-                    messages = [data["text"]]
-            else:
-                # Treat as plain text
-                messages = [file_content]
-        except json.JSONDecodeError:
-            # If JSON parsing fails, treat as plain text
-            messages = [file_content]
-
-        if not messages:
-            raise ValueError(f"No messages found in file: {file_path}")
-
-        # Generate embeddings
-        embeddings = self.embedding_service.encode(messages)
-
-        # Add to index
-        self.index_service.add_embeddings(embeddings)
-
-    def _update_task_status(
-        self, task_id: str, status: str, metadata: Dict[str, Any] = None
-    ) -> None:
-        """Update task status
-
-        Args:
-            task_id: ID of the task
-            status: New status of the task
-            metadata: Additional metadata to include
-        """
-        try:
-            # Get current task status
-            task_file = os.path.join(self.task_store_dir, f"{task_id}.json")
-            current_status = {}
-
-            if os.path.exists(task_file):
-                with open(task_file, "r") as f:
-                    current_status = json.load(f)
-            else:
-                current_status = {
-                    "task_id": task_id,
-                    "created_at": datetime.now().isoformat(),
-                }
-
-            # Update status and metadata
-            current_status["status"] = status
-            current_status["updated_at"] = datetime.now().isoformat()
-
-            if metadata:
-                if "metadata" not in current_status:
-                    current_status["metadata"] = {}
-                current_status["metadata"].update(metadata)
-
-            # Save updated status
-            with open(task_file, "w") as f:
-                json.dump(current_status, f, indent=2)
-
-            # Publish status update to tracking queue
-            self.broker.publish(
-                TASK_TRACKING_QUEUE,
-                {
-                    "task_id": task_id,
-                    "status": status,
-                    "updated_at": current_status["updated_at"],
-                    "metadata": metadata or {},
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"Error updating task status for {task_id}: {e}")
-
-
-class SupervisorProcess:
-    """Supervisor process for managing consumer workers"""
-
-    def __init__(
-        self,
-        broker: MessageBrokerInterface,
-        embedding_service: EmbeddingServiceInterface,
-        index_service: IndexServiceInterface,
-        task_store_dir: str,
-        worker_count: int = 3,
-    ):
-        """Initialize the supervisor process
-
-        Args:
-            broker: Message broker for queue operations
-            embedding_service: Service for generating embeddings
-            index_service: Service for storing embeddings
-            task_store_dir: Directory to store task status
-            worker_count: Number of worker processes to run
-        """
-        self.broker = broker
+        self.message_broker = message_broker
         self.embedding_service = embedding_service
         self.index_service = index_service
         self.task_store_dir = task_store_dir
         self.worker_count = worker_count
+        self.logger = logging.getLogger(__name__)
+
+        # Ensure the task store directory exists
+        os.makedirs(self.task_store_dir, exist_ok=True)
+
+        # Queue name for file processing tasks
+        self.queue_name = "file_processing"
+
+        # Worker threads
         self.workers = []
         self.running = False
-        self.monitor_thread = None
 
     def start(self) -> None:
-        """Start the supervisor and worker processes"""
+        """Start processing files from the queue"""
         if self.running:
             return
 
         self.running = True
 
-        # Start worker processes
+        # Ensure the queue exists
+        try:
+            self.message_broker.declare_queue(queue_name=self.queue_name, durable=True)
+        except Exception as e:
+            self.logger.error(f"Failed to declare queue {self.queue_name}: {e}")
+            return
+
+        # Create and start worker threads
         for i in range(self.worker_count):
-            worker = FileProcessorConsumer(
-                self.broker,
-                self.embedding_service,
-                self.index_service,
-                self.task_store_dir,
-            )
+            worker = threading.Thread(target=self._worker_thread, name=f"FileProcessorWorker-{i}")
+            worker.daemon = True  # Thread will exit when main thread exits
             worker.start()
             self.workers.append(worker)
 
-        # Start monitor thread
-        self.monitor_thread = threading.Thread(target=self._monitor_workers)
-        self.monitor_thread.daemon = True
-        self.monitor_thread.start()
-
-        logger.info(f"Supervisor started with {self.worker_count} workers")
+        self.logger.info(f"Started {self.worker_count} file processor workers")
 
     def stop(self) -> None:
-        """Stop the supervisor and worker processes"""
+        """Stop processing files from the queue"""
         self.running = False
 
-        # Stop all workers
+        # Wait for workers to finish (with timeout)
         for worker in self.workers:
-            worker.stop()
+            worker.join(timeout=2.0)
 
-        # Wait for monitor thread
-        if self.monitor_thread and self.monitor_thread.is_alive():
-            self.monitor_thread.join(timeout=5.0)
+        self.workers = []
+        self.logger.info("Stopped all file processor workers")
 
-        logger.info("Supervisor stopped")
+    def process_file(self, file_path: str, task_id: str) -> bool:
+        """Process a file
 
-    def _monitor_workers(self) -> None:
-        """Monitor worker processes and restart any that have failed"""
+        Args:
+            file_path: The path to the file
+            task_id: The ID of the task
+
+        Returns:
+            True if processing was successful, False otherwise
+        """
+        try:
+            self.logger.info(f"Processing file {file_path} for task {task_id}")
+
+            # Update task status
+            task_data = self._load_task_data(task_id) or {
+                "task_id": task_id,
+                "file_path": file_path,
+                "status": "processing",
+            }
+            task_data["status"] = "processing"
+            self._save_task_data(task_id, task_data)
+
+            # Read the file
+            with open(file_path, "r", encoding="utf-8") as f:
+                text = f.read()
+
+            # Generate embedding
+            embedding = self.embedding_service.embed_document(text)
+
+            # Store in index
+            result = self.index_service.add(embedding, file_path)
+
+            if result:
+                # Update task status to complete
+                task_data["status"] = "completed"
+                task_data["processed_at"] = time.time()
+                self._save_task_data(task_id, task_data)
+                self.logger.info(f"Successfully processed file {file_path} for task {task_id}")
+                return True
+            else:
+                # Update task status to failed
+                task_data["status"] = "failed"
+                task_data["error"] = "Failed to add embedding to index"
+                self._save_task_data(task_id, task_data)
+                self.logger.error(f"Failed to add embedding to index for file {file_path}")
+                return False
+
+        except Exception as e:
+            # Update task status to failed
+            task_data = self._load_task_data(task_id) or {
+                "task_id": task_id,
+                "file_path": file_path,
+            }
+            task_data["status"] = "failed"
+            task_data["error"] = str(e)
+            task_data["traceback"] = traceback.format_exc()
+            self._save_task_data(task_id, task_data)
+
+            self.logger.error(f"Error processing file {file_path} for task {task_id}: {e}")
+            return False
+
+    def _worker_thread(self) -> None:
+        """Worker thread for processing files from the queue"""
+        self.logger.info(f"Worker thread {threading.current_thread().name} started")
+
         while self.running:
-            for i, worker in enumerate(self.workers):
-                if worker.thread is None or not worker.thread.is_alive():
-                    logger.warning(f"Worker {i} is not running, restarting")
+            try:
+                # Get a connection from the pool
+                connection = self.message_broker.get_connection()
 
-                    # Create a new worker
-                    new_worker = FileProcessorConsumer(
-                        self.broker,
-                        self.embedding_service,
-                        self.index_service,
-                        self.task_store_dir,
-                    )
-                    new_worker.start()
+                # Create a channel
+                channel = connection.channel()
 
-                    # Replace the failed worker
-                    self.workers[i] = new_worker
+                # Define the callback for handling messages
+                def callback(ch, method, properties, body):
+                    try:
+                        # Parse message
+                        message = json.loads(body)
+                        task_id = message.get("task_id")
+                        file_path = message.get("file_path")
 
-            # Sleep for a while before checking again
-            time.sleep(30)
+                        if not task_id or not file_path:
+                            self.logger.error("Invalid message format")
+                            ch.basic_reject(delivery_tag=method.delivery_tag, requeue=False)
+                            return
+
+                        # Process the file
+                        success = self.process_file(file_path, task_id)
+
+                        # Acknowledge the message
+                        if success:
+                            ch.basic_ack(delivery_tag=method.delivery_tag)
+                        else:
+                            # Reject the message and don't requeue
+                            ch.basic_reject(delivery_tag=method.delivery_tag, requeue=False)
+
+                    except Exception as e:
+                        self.logger.error(f"Error in message callback: {e}")
+                        # Reject the message and don't requeue
+                        ch.basic_reject(delivery_tag=method.delivery_tag, requeue=False)
+
+                # Set prefetch count to 1
+                channel.basic_qos(prefetch_count=1)
+
+                # Start consuming
+                channel.basic_consume(
+                    queue=self.queue_name, on_message_callback=callback, auto_ack=False
+                )
+
+                self.logger.info(f"Worker {threading.current_thread().name} waiting for messages")
+
+                # Start consuming (this is a blocking call)
+                # Will continue until the channel is closed
+                channel.start_consuming()
+
+            except Exception as e:
+                self.logger.error(f"Error in worker thread: {e}")
+
+                # Sleep before reconnecting
+                time.sleep(5)
+
+        self.logger.info(f"Worker thread {threading.current_thread().name} exiting")
+
+    def _save_task_data(self, task_id: str, task_data: Dict[str, Any]) -> None:
+        """Save task data to disk
+
+        Args:
+            task_id: The ID of the task
+            task_data: The task data to save
+        """
+        try:
+            task_file = os.path.join(self.task_store_dir, f"{task_id}.json")
+            with open(task_file, "w") as f:
+                json.dump(task_data, f)
+        except Exception as e:
+            self.logger.error(f"Error saving task data for {task_id}: {e}")
+
+    def _load_task_data(self, task_id: str) -> Dict[str, Any]:
+        """Load task data from disk
+
+        Args:
+            task_id: The ID of the task
+
+        Returns:
+            The task data or None if not found
+        """
+        try:
+            task_file = os.path.join(self.task_store_dir, f"{task_id}.json")
+            if not os.path.exists(task_file):
+                return None
+
+            with open(task_file, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            self.logger.error(f"Error loading task data for {task_id}: {e}")
+            return None

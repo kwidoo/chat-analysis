@@ -11,3 +11,5 @@ backend/flask_sessions
 backend/auth.db
 backend/dev_auth.db
 backend/db/*.db
+.mypy_cache
+.pytest_cache

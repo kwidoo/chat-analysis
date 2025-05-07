@@ -6,12 +6,12 @@ import shutil
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 import faiss
 import git
 import numpy as np
-from git import GitCommandError, GitError, Repo
+from git import GitError
 from services.interfaces import IndexVersionManagerInterface
 
 logger = logging.getLogger(__name__)

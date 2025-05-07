@@ -1,7 +1,9 @@
 import os
-from flask import jsonify, current_app
-from . import models_bp
-from services.embedding_service import ModelRegistry
+
+from flask import Blueprint, current_app, jsonify
+from services.default_embedding_service import ModelRegistry
+
+models_bp = Blueprint("models", __name__)
 
 
 @models_bp.route("/list")

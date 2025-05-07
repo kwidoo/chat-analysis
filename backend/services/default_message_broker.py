@@ -19,7 +19,7 @@ class RabbitMQConnectionPool(IMessageBroker):
 
     def __init__(
         self,
-        host: str = "localhost",
+        host: str = "rabbitmq",
         port: int = 5672,
         user: str = "guest",
         password: str = "guest",
